@@ -1,0 +1,9 @@
+language: clojure
+script:
+  - boot build
+  - boot test
+jdk:
+  - openjdk6
+  - openjdk7
+  - oraclejdk7
+  - oraclejdk8

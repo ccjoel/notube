@@ -32,10 +32,10 @@
     (let [code (get params "code")]
       ;; TODO: set timeout for if user doesnt authenticate?
       (go (do
-            (log/trace "Putting for code in creds-chan inside async/go")
+            (log/trace (str "Putting code in creds-chan inside async/go: " code))
             (>! creds-chan code)
-            (log/trace "Finished putthing code in creds-chan inside async/go")))
-      (log/debug (str "Got code from oauth2:" code))
+            (log/trace "Finished putting code in creds-chan inside async/go")))
+      (log/debug (str "Got code from oauth2: " code))
       ;; TODO: close browser? or do we leave user there doing nothing?
       ;; if browse-url cant close browser- can we use something like selenium?
 
@@ -61,7 +61,7 @@
 (defn start-server!
   ""
   []
-  (log/debug (str "Starting Server on port" server-port "to catch oath code"))
+  (log/debug (str "Starting Server on port " server-port " to catch oath code"))
   (reset! server (web/run-server (handler/site #'all-routes) {:port server-port})))
 
 (defn stop-server!
@@ -104,6 +104,21 @@
     (catch Exception e
       (log/error (str e)))))
 
+(defn persist-tokens!
+  ""
+  [tokens-map-atom]
+  (log/debug "Storing tokens map into tokens.edn")
+  (spit (clojure.java.io/resource "tokens.edn")
+        (let [as-json (json/read-str @tokens-map-atom)]
+          (str {:access-token (get as-json "access_token")
+                :refresh-token (get as-json "refresh_token")}))))
+
+(defn read-persisted-tokens
+  ""
+  []
+  (log/debug "Retrieving tokens map from tokens.edn")
+  (edn/read-string (slurp (clojure.java.io/resource "tokens.edn"))))
+
 (defn populate-tokens!
   "Use most functions in this namespace to setup a server, start a browser session, authenticate users and setup tokens for use by api."
   []
@@ -112,29 +127,13 @@
   (browser/browse-url (authorization-uri oauth2-params))
   ;; TODO: set a timeout here just in case user doesnt log in
   (log/debug "Awaiting code-map from creds channel")
-  (let [code-map (<!! creds-chan)]
-    (log/trace "Got code-map from creds channel:" code-map)
-    (reset! token-map (fetch-tokens! code-map)))
-  (stop-server!))
-
-
-;; (populate-tokens!)
-
-;; {"access_token" "ya29.Glv0A_ZQC3Ug1GANuIgcvZcHmMv6cItWV4xBw8_YJME4PErwqc51qPhqWx0_i7ODib6EtSXLF2Xq8MYyIHjpk1vtyJsrzs_5PuZ3sYq3huMJyqwvU5_ovr_b0SJX", "expires_in" 3600, "refresh_token" "1/tKlMP9WgyiKrq5wSONWQfMP5Gxqad87IbwKap5rB6rY", "token_type" "Bearer"}
-
-
-
-;; TODO: use this to write and read token results...
-
-;; don't forget to grab api-key before overwriting file...
-;; (spit (clojure.java.io/resource "tokens.edn")
-;;       (let [as-json (json/read-str @token-map)]
-;;         (str {:access-token (get as-json "access_token")
-;;                   :refresh-token (get as-json "refresh_token")})))
-
-;; (edn/read-string (slurp (clojure.java.io/resource "tokens.edn")))
-
-
+  (go
+    (let [code-map (<! creds-chan)]
+      (log/trace "Got code-map from creds channel: " code-map)
+      (reset! token-map (fetch-tokens! code-map))
+      (log/trace (str "Token-map new value: " @token-map))
+      (persist-tokens! token-map)
+      (stop-server!))))
 
 
 ;; (defn endpoint-call
@@ -145,13 +144,16 @@
 ;;         [access-token refresh-token])
 ;;    (catch [:status 401] _ (refresh-tokens refresh-token))))
 
+;; TODO: macro to wrap all catch 401 unauthorized from youtube api oauth calls?
+
+;; TODO: test and modify this function
 (defn refresh-tokens!
   "Request a new access token
-
-  Note that there are limits on the number of refresh tokens that will be issued; one limit per client/user combination, and another per user across all clients.
+  Note that there are limits on the number of refresh tokens that will be issued;
+  one limit per client/user combination, and another per user across all clients.
   You should save refresh tokens in long-term storage and continue to use them as long as they remain valid.
-  If your application requests too many refresh tokens, it may run into these limits, in which case older refresh tokens will stop working.
-  "
+  If your application requests too many refresh tokens, it may run into these limits,
+  in which case older refresh tokens will stop working."
   [refresh-token]
   (log/trace (str "Refreshing access token with refresh-token:" refresh-token))
   (try+

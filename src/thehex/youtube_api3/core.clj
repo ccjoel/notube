@@ -1,6 +1,11 @@
 (ns thehex.youtube-api3.core
   (:require [thehex.youtube-api3.config :as config]
-            [clj-http.client :as http]))
+            [thehex.oauth.lib :as oauth]
+            [clj-http.client :as http]
+            [clojure.edn :as edn]
+            [clojure.data.json :as json]
+            [thehex.notube.config :as notube-config]
+            [taoensso.timbre :as log]))
 
 ;; use YOUTUBE_API_KEY environmental variable
 
@@ -31,6 +36,12 @@
 ;;   }
 ;; }
 
+
+(def tokens (oauth/read-persisted-tokens))
+
+(def api-key (-> (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
+                 :api-key))
+
 (defn get-user-channels
   "
   Example...
@@ -42,6 +53,9 @@
 
   TODO: try catch 401. if 401, we nee to refresh the access token
   TODO: this call is not part of the oauth validation file, is an actual api call. move
+
+  Use like: (get-user-channels (:access-token tokens))
+
   "
   [access-token]
   (let [url (str config/api-base "channels?part=id&mine=true")
@@ -53,12 +67,30 @@
             ;; will receive a 401 HTTP unauthorize if the access token expired
             ;;:user ... old example on getting data...
             )
-        result-count (:totalResults (:pageInfo body))]
+        ;; TODO: this is json at this point:
+        as-json (json/read-str body)
+        result-count (get (get as-json "pageInfo") "totalResults")]
+    (log/debug (str "got body in get-user-channels: " body))
 
     (if (> result-count 0)
-      (:items body)
+      (get as-json "items")
       nil)))
 
+
+(defn get-channel-activity
+  "Original Url: https://www.googleapis.com/youtube/v3/activities?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&key=
+
+  Use like: `(get-channel-activity api-key 'UC-lHJZR3Gqxm24_Vd_AJ5Yw')`
+
+
+  my channel= UC4-vzjcBolmvYWYP6ldbLbA
+  another channel id = UC4u8goEsLgpPvDX2mKD70nQ
+  "
+  [api-key channel-id]
+  (let [url (str config/api-base "activities?part=snippet&channelId=" channel-id "&key=" api-key)
+        body (-> (http/get url {:as :json}) :body)]
+    (log/trace (str "got activites: " body))
+    body))
 
 ;; (get-user-channels "ya29.GlvzA_ODOrwscUER_kCPoJcNENgVxbPrbqeSq78_gCiwftNfd6GODfmqsAAvQMOAnAO_nRqJndAQeXX4FajYUO8l3WO0JBAqCLBGXqdM8-4O9NnDuTs662dSAUq9")
 ;; => "{\n \"kind\": \"youtube#channelListResponse\",\n \"etag\": \"\\\"uQc-MPTsstrHkQcRXL3IWLmeNsM/97Iyxf_peaO9sJsTg-Dx0zTmPcw\\\"\",\n \"pageInfo\": {\n  \"totalResults\": 1,\n  \"resultsPerPage\": 1\n },\n \"items\": [\n  {\n   \"kind\": \"youtube#channel\",\n   \"etag\": \"\\\"uQc-MPTsstrHkQcRXL3IWLmeNsM/xzn__LA2JEsGtk0Zo_TG8tb3c9U\\\"\",\n   \"id\": \"UC4-vzjcBolmvYWYP6ldbLbA\"\n  }\n ]\n}\n"

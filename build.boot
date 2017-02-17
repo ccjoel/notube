@@ -41,7 +41,7 @@
 (deftask run
   "Run the project."
   [a args ARG [str] "the arguments for the application."]
-  (require '[thehex.notube.core :as app])
+  (require '[thehex.oauth.core :as app])
   (apply (resolve 'app/-main) args))
 
 (require '[adzerk.boot-test :refer [test]])

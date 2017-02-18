@@ -157,15 +157,19 @@
   [refresh-token]
   (log/trace (str "Refreshing access token with refresh-token:" refresh-token))
   (try+
-   (let [{{access-token :access_token} :body}
-         (http/post (:access-token-uri oauth2-params)
+   (let [body (http/post (:access-token-uri oauth2-params)
                     {:form-params {:grant_type       "refresh_token"
                                    :refresh_token    refresh-token
                                    :client_id (:client-id oauth2-params)
                                    :client_secret (:client-secret oauth2-params)}
                      :as          :json})]
-     [access-token refresh-token])
+     (log/trace "Refresh-tokens response body:" body)
+     [(get body "access_token") refresh-token])
    (catch [:status 401]
        ;; TODO: do something if refresh token has expired or otherwise lost...
        ;; like do the oauth login process again?
        e (log/error (str "Received unauthorized 401 while trying to refresh tokens" e)))))
+
+;; (def tokens (read-persisted-tokens))
+
+;; (refresh-tokens! (:refresh-token tokens))

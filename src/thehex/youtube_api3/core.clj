@@ -8,7 +8,16 @@
             [taoensso.timbre :as log])
   (:use [slingshot.slingshot :only [try+ throw+]]))
 
-;; use YOUTUBE_API_KEY environmental variable?
+;; TODO: use YOUTUBE_API_KEY environmental variable
+
+;; - Specific Comment by Id
+;; https://www.googleapis.com/youtube/v3/comments?id=z124jjhzrlfitdvcw23xfzyrdya4ij0kj&part=snippet&key=
+
+;; - Video info (statistics.. change part to get different info)
+;; https://www.googleapis.com/youtube/v3/videos?part=statistics&id=UTXCu1VQDRw&key=
+
+;; - Search all videos of pewdiepie's channel, ordered by date, newest first
+;; https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&order=date&key=
 
 ;; With OAUTH and logged in w/ youtube user:
 ;; POST https://www.googleapis.com/youtube/v3/commenThreads?part=snippet&key=
@@ -27,36 +36,33 @@
 
 (def tokens (oauth/read-persisted-tokens))
 
+;; TODO: don't store api-key in resources. Allow default location for these configs
+;;       and allow user to specify a different folder for configs.
+;;       then read all json/edn configuration from that folder
 (def api-key (->
               (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
               :api-key))
 
 (defn get-user-channels
-  "
-  Example...
+  " Example...
   The API supports two ways to specify an access token:
   1. curl -H \"Authorization: Bearer ACCESS_TOKEN\" https://www.googleapis.com/youtube/v3/channels?part=id&mine=true
   2. curl https://www.googleapis.com/youtube/v3/channels?part=id&mine=true&access_token=ACCESS_TOKEN
-
-  try #2 if option #1 doesnt work
-
   TODO: try catch 401. if 401, we nee to refresh the access token
   TODO: this call is not part of the oauth validation file, is an actual api call. move
-
-  Use like: (get-user-channels (:access-token tokens))
-
-  "
-  [access-token]
+  Use like: (get-user-channels) "
+  []
   (try+
    (let [url (str config/api-base "channels?part=id&mine=true")
-         body (-> @(http/get url
-                            {:headers {:Authorization (str "Bearer " access-token)}})
+         body (-> (http/get url
+                            {:headers {:Authorization
+                                       (str "Bearer " (:access-token tokens))}
+                             :as :json})
                   :body ;; body is json
                   ;; TODO: parse response json to actually get info
                   ;; will receive a 401 HTTP unauthorize if the access token expired
                   ;;:user ... old example on getting data...
                   )
-         ;; TODO: this is json at this point:
          as-json (json/read-str body)
          result-count (get (get as-json "pageInfo") "totalResults")]
      (log/debug (str "Got body in get-user-channels: " body))
@@ -67,59 +73,20 @@
    (catch [:status 401] e (log/error e))))
 
 (defn get-video-commentThreads
-  "
-  https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=UTXCu1VQDRw&key=
-
-  Use like:
-  "
-  [api-key video-id]
+  " https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=UTXCu1VQDRw&key=
+  Use like: (get-video-commentThreads 84389473498348) "
+  [video-id]
   (try+
    (let [url (str config/api-base "commentThreads?part=snippet&videoId="
                   video-id "&order=time&key=" api-key)
-         body (-> @(http/get url) :body)]
-     (let [as-json (json/read-str body)
-           items (get as-json "items")]
-       ;; TODO: go through the items, parse and getting info we want
-       (log/trace "Got commentThreads for a video:")
-       items))
-   (catch [:status 401] e (log/error e))))
-
-(defn get-video-comments
-  "Specific Comment by Id
-   https://www.googleapis.com/youtube/v3/comments?id=z124jjhzrlfitdvcw23xfzyrdya4ij0kj&part=snippet&key="
-  [api-key parent-id]
-  (try+
-   (let [url (str config/api-base "comments?part=snippet&parentId="
-                  parent-id "&key=" api-key)
-         body (-> @(http/get url) :body)]
+         body (-> (http/get url {:as :json}) :body)]
+     (log/debug (str "Got videos from search: " body))
      (let [as-json (json/read-str body)
            items (get as-json "items")]
        ;; TODO: go through the items, parse and getting info we want
        (log/trace "Got comments for a video:")
        items))
    (catch [:status 401] e (log/error e))))
-
-(defn mark-comment-as-spam
-  "
-  https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=UTXCu1VQDRw&key=
-
-  Use like:
-  "
-  [access-token comment-id]
-  (log/warn "Marking comment as spam")
-  (try+
-   (let [url (str config/api-base "comments/markAsSpam?id="
-                  comment-id)]
-     ;; should check for a 204 which is confirmation for marking as spam
-     @(http/post url
-                {:headers {:Authorization (str "Bearer " access-token)}})
-     ;; (log/debug "marked comment as spam...")
-     )
-   (catch [:status 401] e (log/error e))
-   (catch [:status 403] e (log/error e))))
-
-;; repl'ing.. this next call worked!
-(mark-comment-as-spam (:access-token tokens) "z13xvl2ovsqtiz1wj04cfrpxgkmwhvb5zok0k")
 
 (defn get-channel-activity
   "Original Url: https://www.googleapis.com/youtube/v3/activities?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&key=
@@ -128,45 +95,41 @@
 
 
   my channel= UC4-vzjcBolmvYWYP6ldbLbA
-  another channel id = UC4u8goEsLgpPvDX2mKD70nQ
-  "
-  [api-key channel-id]
+  another channel id = UC4u8goEsLgpPvDX2mKD70nQ "
+  [channel-id]
   (let [url (str config/api-base "activities?part=snippet&channelId=" channel-id "&key=" api-key)
-        body (-> @(http/get url) :body)]
+        body (-> (http/get url {:as :json}) :body)]
     (log/debug (str "Got activites: " body))
     body))
 
 (defn search-videos
   "Original Url: https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&key=
 
-  Search all videos of pewdiepie's channel, ordered by date, newest first
-  https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&order=date&key=
-
   Use like: `(search-videos api-key 'UC-lHJZR3Gqxm24_Vd_AJ5Yw')`
   ^ pewds channel
 
   my channel= UC4-vzjcBolmvYWYP6ldbLbA
-  another channel id = UC4u8goEsLgpPvDX2mKD70nQ
-  "
-  [api-key channel-id]
+  another channel id = UC4u8goEsLgpPvDX2mKD70nQ "
+  [channel-id]
   (let [url (str config/api-base "search?part=snippet&channelId=" channel-id
                  "&key=" api-key "&order=date")
-        body (-> @(http/get url) :body)]
+        body (-> (http/get url {:as :json}) :body)]
     (log/debug (str "Got videos from search: " body))
     (let [as-json (json/read-str body)]
       ;; TODO: go through the items, parse and getting info we want
       (get as-json "items"))))
 
-;; (defn parse-videos
-;;   "Loop through videos for things that interest us..."
-;;   []
-;;   "")
+(defn parse-videos
+  "Loop through videos, find all comment threads, scan each,
+  store bad ones on a file..."
+  []
+  "")
 
-;; ;; (get-video-commentThreads api-key "d2dNb0wdJF0")
+;; (get-video-commentThreads api-key "d2dNb0wdJF0")
 
-;; ;; (search-videos api-key "UC-lHJZR3Gqxm24_Vd_AJ5Yw")
+;; (search-videos api-key "UC-lHJZR3Gqxm24_Vd_AJ5Yw")
 
-;; ;; videos for a channel:
+;; videos for a channel:
 ;; [{"kind" "youtube#searchResult",
 ;;  "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/xL2Kk-wHmX7jWjGq4UC1iRNQW00\"",
 ;;  "id" {"kind" "youtube#video",
@@ -282,9 +245,7 @@
 ;;  "publishedAt" "2017-02-18T19:49:34.000Z"}},
 ;;  "canReply" false,
 ;;  "totalReplyCount" 0,
-;;             "isPublic" true}}
-
-;;  {"kind" "youtube#commentThread",
+;;  "isPublic" true}} {"kind" "youtube#commentThread",
 ;;  "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/Qb8XHO_j4KGnp1v3N1QKPcl6wig\"",
 ;;  "id" "z12shlsrdtz0gjrm023ytpdxypjxdhoni",
 ;;  "snippet" {"videoId" "d2dNb0wdJF0",
@@ -305,9 +266,7 @@
 ;;  "publishedAt" "2017-02-18T19:49:32.000Z"}},
 ;;  "canReply" false,
 ;;  "totalReplyCount" 0,
-;;             "isPublic" true}}
-
-;;  {"kind" "youtube#commentThread",
+;;  "isPublic" true}} {"kind" "youtube#commentThread",
 ;;  "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/_v5JPAWQbGteqGgPhs1FS3pmVYc\"",
 ;;  "id" "z13jfjqqqyqcsf2qv04cilyhoymutxwaxho",
 ;;  "snippet" {"videoId" "d2dNb0wdJF0",
@@ -328,9 +287,7 @@
 ;;  "publishedAt" "2017-02-18T19:49:27.000Z"}},
 ;;  "canReply" false,
 ;;  "totalReplyCount" 0,
-;;             "isPublic" true}}
-
-;;  {"kind" "youtube#commentThread",
+;;  "isPublic" true}} {"kind" "youtube#commentThread",
 ;;  "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/JYrx4nX_y60-v8uR48sjh0c-dpk\"",
 ;;  "id" "z13hurtjypejstvra04ci5wwvqubvzxwm24",
 ;;  "snippet" {"videoId" "d2dNb0wdJF0",
@@ -351,9 +308,7 @@
 ;;  "publishedAt" "2017-02-18T19:49:25.000Z"}},
 ;;  "canReply" false,
 ;;  "totalReplyCount" 0,
-;;             "isPublic" true}}
-
-;;  {"kind" "youtube#commentThread",
+;;  "isPublic" true}} {"kind" "youtube#commentThread",
 ;;  "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/FznlI6Cbcq2bl91OxawulNEmK_0\"",
 ;;  "id" "z13xsdoynkyzhpyzm04ccduivvfss5h5j44",
 ;;  "snippet" {"videoId" "d2dNb0wdJF0",
@@ -647,32 +602,28 @@
 ;;  "publishedAt" "2017-02-18T19:49:00.000Z"}},
 ;;  "canReply" false,
 ;;  "totalReplyCount" 0,
-;;             "isPublic" true}}
-
-;;  {"kind" "youtube#commentThread",
-;;   "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/6rzPsBSlGgYUbsFdaNT1W8lYb5g\"",
-;;   "id" "z13xvl2ovsqtiz1wj04cfrpxgkmwhvb5zok0k",
-;;   "snippet" {"videoId" "d2dNb0wdJF0",
-;;              "topLevelComment" {"kind" "youtube#comment",
-;;                                 "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/vO1aAbS4eSd6Z2Swj-6PS4KtZ-c\"",
-;;                                 "id" "z13xvl2ovsqtiz1wj04cfrpxgkmwhvb5zok0k",
-;;                                 "snippet" {"textOriginal" "This is Bob - 🐨\nBob has no penis\n1 like = 1 penis 🍆",
-;;                                            "updatedAt" "2017-02-18T19:48:59.000Z",
-;;                                            "authorProfileImageUrl" "https://yt3.ggpht.com/-1FlFWIb0gFY/AAAAAAAAAAI/AAAAAAAAAAA/mFk1cYFrwxM/s28-c-k-no-mo-rj-c0xffffff/photo.jpg",
-;;                                            "authorDisplayName" "iArvin",
-;;                                            "videoId" "d2dNb0wdJF0",
-;;                                            "textDisplay" "This is Bob - 🐨<br />Bob has no penis<br />1 like = 1 penis 🍆",
-;;                                            "authorChannelUrl" "http://www.youtube.com/channel/UC7eXcXvkGEoYpjjYv2hrqxA",
-;;                                            "canRate" false,
-;;                                            "authorChannelId" {"value" "UC7eXcXvkGEoYpjjYv2hrqxA"},
-;;                                            "likeCount" 0,
-;;                                            "viewerRating" "none",
-;;                                            "publishedAt" "2017-02-18T19:48:59.000Z"}},
-;;              "canReply" false,
-;;              "totalReplyCount" 0,
-;;              "isPublic" true}}
-
-;;  {"kind" "youtube#commentThread",
+;;  "isPublic" true}} {"kind" "youtube#commentThread",
+;;  "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/6rzPsBSlGgYUbsFdaNT1W8lYb5g\"",
+;;  "id" "z13xvl2ovsqtiz1wj04cfrpxgkmwhvb5zok0k",
+;;  "snippet" {"videoId" "d2dNb0wdJF0",
+;;  "topLevelComment" {"kind" "youtube#comment",
+;;  "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/vO1aAbS4eSd6Z2Swj-6PS4KtZ-c\"",
+;;  "id" "z13xvl2ovsqtiz1wj04cfrpxgkmwhvb5zok0k",
+;;  "snippet" {"textOriginal" "This is Bob - 🐨\nBob has no penis\n1 like = 1 penis 🍆",
+;;  "updatedAt" "2017-02-18T19:48:59.000Z",
+;;  "authorProfileImageUrl" "https://yt3.ggpht.com/-1FlFWIb0gFY/AAAAAAAAAAI/AAAAAAAAAAA/mFk1cYFrwxM/s28-c-k-no-mo-rj-c0xffffff/photo.jpg",
+;;  "authorDisplayName" "iArvin",
+;;  "videoId" "d2dNb0wdJF0",
+;;  "textDisplay" "This is Bob - 🐨<br />Bob has no penis<br />1 like = 1 penis 🍆",
+;;  "authorChannelUrl" "http://www.youtube.com/channel/UC7eXcXvkGEoYpjjYv2hrqxA",
+;;  "canRate" false,
+;;  "authorChannelId" {"value" "UC7eXcXvkGEoYpjjYv2hrqxA"},
+;;  "likeCount" 0,
+;;  "viewerRating" "none",
+;;  "publishedAt" "2017-02-18T19:48:59.000Z"}},
+;;  "canReply" false,
+;;  "totalReplyCount" 0,
+;;  "isPublic" true}} {"kind" "youtube#commentThread",
 ;;  "etag" "\"uQc-MPTsstrHkQcRXL3IWLmeNsM/1Dn25Gd_MVoW1IWVobV4AvRgxlo\"",
 ;;  "id" "z12dwv2h2t3bwjznt22zhjliux3dj3ok2",
 ;;  "snippet" {"videoId" "d2dNb0wdJF0",

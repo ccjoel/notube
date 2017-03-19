@@ -43,9 +43,7 @@
       (log/debug (str "Got code from oauth2: " code))
       ;; TODO: close browser? or do we leave user there doing nothing?
       ;; if browse-url cant close browser- can we use something like selenium?
-
-      ;; return something to browser body
-      "Authentication Succeeded.")))
+      "Authentication Succeeded."))) ;; Return something to browser body
 
 (defn authorization-uri
   "Create authorization uri from params"
@@ -109,11 +107,11 @@
 
 (defn persist-tokens!
   ""
-  [tokens-map-atom]
+  [tokens-map]
   (log/debug "Storing tokens map into tokens.edn")
-  (log/debug (str "Token map atom res: " tokens-map-atom))
-  (spit (clojure.java.io/resource "tokens.edn")
-        (let [as-json (json/read-str tokens-map-atom)]
+  (log/debug (str "Token map atom res: " tokens-map))
+  (spit (util/with-abs-path "tokens.edn")
+        (let [as-json (json/read-str tokens-map)]
           (str {:access-token (get as-json "access_token")
                 :refresh-token (get as-json "refresh_token")}))))
 
@@ -121,7 +119,7 @@
   ""
   []
   (log/debug "Retrieving tokens map from tokens.edn")
-  (edn/read-string (slurp (clojure.java.io/resource "tokens.edn"))))
+  (edn/read-string (slurp (util/with-abs-path "tokens.edn"))))
 
 (defn populate-tokens!
   "Use most functions in this namespace to setup a server, start a browser session, authenticate users and setup tokens for use by api."
@@ -176,7 +174,3 @@
        ;; TODO: do something if refresh token has expired or otherwise lost...
        ;; like do the oauth login process again?
        e (log/error (str "Received unauthorized 401 while trying to refresh tokens" e)))))
-
-;; (def tokens (read-persisted-tokens))
-
-;; (refresh-tokens! (:refresh-token tokens))

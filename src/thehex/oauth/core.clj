@@ -7,10 +7,7 @@
   "FIXME"
   [& args]
   (log/info "Starting oauth core -main")
-  (oauth/populate-tokens!)
-  ;; (oauth/persist-tokens! (oauth/token-map))
-  )
-
+  (oauth/populate-tokens!))
 
 ;; Token-map new value: {
 ;;                       "access_token" : "ya29.Glv1A7u27r7FdPdD8DvLNPGjdcUg9Q_-WdqEwHw9qdhIV_buHKNyNjGTb5gBIDZD_7dBKA_5AQj11cIbkMMf6gOLm5-sM_9sE6VaWq-90zeS4gaMmocU5BmQmkDz",

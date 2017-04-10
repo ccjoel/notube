@@ -1,2 +1,4 @@
 {:port "8889"
- :api-key ""}
+ :api-key ""
+ :youtube-client-id ""
+ :youtube-client-secret ""}

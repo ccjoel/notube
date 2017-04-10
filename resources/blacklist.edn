@@ -1,7 +1,25 @@
-{:spam [["this is" "has no" "1 like = 1"]]
+{:spam [["this is" "has no"]
+        "1 like = 1"
+        "I have a small surprise!"
+        "I have a surprise on my newest video"
+        "pimba"
+        "subscribe to anyone who subs to me"
+        "sub for sub"
+        "thumbs up if your watching this in"
+        "PLEASE DON'T READ THIS. YOU WILL BE"
+        "checkout my channel"
+        "search for this youtube video"
+        "checkout my friends youtube channel"
+        "suscribance my channel"
+        "Subscribe to my channel"]
  :bullying ["cunt"
             "autist"
             "kill yourself"]
- :hate-speech ["nigga"]
+ :hate-speech ["nigga"
+               "fag"
+               "faggot"]
  :porn []
+ :users ["PewDeiPei"
+         "pewdiepei"
+         "piediepew"]
  }

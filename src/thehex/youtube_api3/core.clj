@@ -74,7 +74,11 @@
 
 (defn get-video-commentThreads
   " https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=UTXCu1VQDRw&key=
-  Use like: (get-video-commentThreads 84389473498348) "
+  Use like: (get-video-commentThreads 84389473498348)
+
+   TODO: use fn arity or optional param? to use nextPageToken, if available, in
+         order to retrieve the rest pages of results
+  "
   [video-id]
   (try+
    (let [url (str config/api-base "commentThreads?part=snippet&videoId="
@@ -94,7 +98,9 @@
 
 
   my channel= UC4-vzjcBolmvYWYP6ldbLbA
-  another channel id = UC4u8goEsLgpPvDX2mKD70nQ "
+  another channel id = UC4u8goEsLgpPvDX2mKD70nQ
+  TODO: add an optional pagination param, by using fn arity, to retrieve that specific page
+  the id on the json payload is called 'nextPageToken'"
   [channel-id]
   (let [url (str config/api-base "activities?part=snippet&channelId=" channel-id "&key=" api-key)
         body (-> (http/get url {:as :json}) :body)]
@@ -108,7 +114,10 @@
   ^ pewds channel
 
   my channel= UC4-vzjcBolmvYWYP6ldbLbA
-  another channel id = UC4u8goEsLgpPvDX2mKD70nQ "
+  another channel id = UC4u8goEsLgpPvDX2mKD70nQ
+
+  TODO: add an optional pagination param, by using fn arity
+  "
   [channel-id]
   (let [url (str config/api-base "search?part=snippet&channelId=" channel-id
                  "&key=" api-key "&order=date")
@@ -117,6 +126,11 @@
     (let [as-json (json/read-str body)]
       ;; TODO: go through the items, parse and getting info we want
       (get as-json "items"))))
+
+(defn report-comment-as-spam
+  "TODO: "
+  [commentId]
+  "")
 
 
 ;; (get-video-commentThreads api-key "d2dNb0wdJF0")

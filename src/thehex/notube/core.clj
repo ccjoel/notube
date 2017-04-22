@@ -22,8 +22,8 @@
 (def blacklist (edn/read-string
                 (slurp (clojure.java.io/resource "blacklist.edn"))))
 
-(def videos (edn/read-string
-                (slurp (clojure.java.io/resource "sample-data/videos.edn"))))
+;; (def videos (edn/read-string
+;;                 (slurp (clojure.java.io/resource "sample-data/videos.edn"))))
 
 (defn parse-videos
   "Loop through videos, find all comment threads, scan each,
@@ -51,7 +51,7 @@
   (map handle-comment comments))
 
 (defn handle-comment
-  " todo... report using youtube api "
+  " TODO: report spam using youtube api "
   [comment]
   (let [text (get-in (first sc) ["snippet" "topLevelComment" "snippet" "textOriginal"])
         author (get-in comment ["snippet" "topLevelComment" "snippet" "authorDisplayName"])]
@@ -80,3 +80,16 @@
   (or
    (some #(= (clojure.string/lower-case author) (clojure.string/lower-case %)) (:users blacklist))
    (some #(str-in? text %) (:spam blacklist))))
+
+(defn handle-all-videos
+  "call yt api for videos, then continually call parse-videos on the set of results,
+  by using the nextPageToken if its available on response body"
+  []
+  "")
+
+(defn handle-all-comments
+  "call yt api for videos, and use in handle-video to contunually query for all comments,
+  and be able to report from all of them. by using nextPageToken if its available
+  in response body."
+  []
+  "")

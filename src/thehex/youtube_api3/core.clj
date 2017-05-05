@@ -110,7 +110,7 @@
 (defn search-videos
   "Original Url: https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&key=
 
-  Use like: `(search-videos api-key 'UC-lHJZR3Gqxm24_Vd_AJ5Yw')`
+  Use like: `(search-videos 'UC-lHJZR3Gqxm24_Vd_AJ5Yw')`
   ^ pewds channel
 
   my channel= UC4-vzjcBolmvYWYP6ldbLbA
@@ -124,15 +124,28 @@
         body (-> (http/get url {:as :json}) :body)]
     (log/debug (str "Got videos from search: " body))
     (let [as-json (json/read-str body)]
-      ;; TODO: go through the items, parse and getting info we want
       (get as-json "items"))))
 
 (defn report-comment-as-spam
-  "TODO: "
-  [commentId]
-  "")
-
+  "Reports a comment as spam, provided a comment id.
+   This could fail for several reasons, including:
+  - Comments not based on Google+ cannot be marked as spam.
+  - insufficient permissions. The request might not be properly authorized.
+  - commentNotFound"
+  [comment-id]
+  (try+
+   (let [url (str config/api-base "comments/markAsSpam?id=" comment-id)
+         res (http/post url
+                        {:headers {:Authorization
+                                   (str "Bearer " (:access-token tokens))}
+                         :as :json})]
+     (log/info "Sucessfully reported comment as spam, with result: ")
+     (log/debug (str res)) ;; (:status res) == 204 no content
+     true)
+   (catch [:status 401] e (log/error e) false)
+   (catch [:status 400] e (log/error e) false)
+   (catch [:status 403] e (log/error e) false)
+   (catch [:status 404] e (log/error e) false)))
 
 ;; (get-video-commentThreads api-key "d2dNb0wdJF0")
-
 ;; (search-videos api-key "UC-lHJZR3Gqxm24_Vd_AJ5Yw")

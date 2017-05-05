@@ -8,8 +8,6 @@
             [taoensso.timbre :as log])
   (:use [slingshot.slingshot :only [try+ throw+]]))
 
-;; TODO: use YOUTUBE_API_KEY environmental variable
-
 ;; - Specific Comment by Id
 ;; https://www.googleapis.com/youtube/v3/comments?id=z124jjhzrlfitdvcw23xfzyrdya4ij0kj&part=snippet&key=
 
@@ -36,9 +34,6 @@
 
 (def tokens (oauth/read-persisted-tokens))
 
-;; TODO: don't store api-key in resources. Allow default location for these configs
-;;       and allow user to specify a different folder for configs.
-;;       then read all json/edn configuration from that folder
 (def api-key (->
               (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
               :api-key))
@@ -86,6 +81,7 @@
          body (-> (http/get url {:as :json}) :body)]
      (log/debug (str "Got videos from search: " body))
      (let [as-json (json/read-str body)
+           ;; getting "items", but also need to pass aroudn the next page link/url
            items (get as-json "items")]
        (log/trace "Got comments for a video..")
        items))

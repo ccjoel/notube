@@ -8,10 +8,6 @@
   (:gen-class))
 
 (println "loading ..... thehex.notube.core yo!")
-;; (defn -main
-;;   "FIXME"
-;;   [& args]
-;;   (println (str "Main doesn't do anything... hello: " (+ 2 2))))
 
 (declare parse-comments
          handle-comment
@@ -22,8 +18,8 @@
 (def blacklist (edn/read-string
                 (slurp (clojure.java.io/resource "blacklist.edn"))))
 
-;; (def videos (edn/read-string
-;;                 (slurp (clojure.java.io/resource "sample-data/videos.edn"))))
+(def videos (edn/read-string
+                (slurp (clojure.java.io/resource "sample-data/videos.edn"))))
 
 (defn parse-videos
   "Loop through videos, find all comment threads, scan each,
@@ -34,18 +30,28 @@
 
 (defn handle-video
   [video]
-  ;; todo... remove this next assertion line after debugging
-  (assert (= "PewDiePie" (get video "channelTitle")) "Unexpected channel name!??")
-  (log/infod "Handling a video for channel: %s" (get video "channelTitle"))
+  (log/infof "Handling a video for channel: %s" (get video "channelTitle"))
   (log/debugf "Handling video with title: %s\n" (get video "title"))
-  (let [videoId (get (get video "id") "videoId")]
-    ;; TODO: go through all pages of comments...
-    (parse-comments (yt/get-video-commentThreads videoId))))
+  (let [video-id (get (get video "id") "videoId")
+        next-page-token (get video "")]
+    (handle-all-comments video-id)))
 
 (defn parse-comments
   "loop through all comments from one page"
   [comments]
   (map handle-comment comments))
+
+(defn handle-comment
+  "Store comment into spam-queue or whitelist queue."
+  [comment]
+  (let [text (get-in comment ["snippet" "topLevelComment" "snippet" "textOriginal"])
+        author (get-in comment ["snippet" "topLevelComment" "snippet" "authorDisplayName"])]
+    (if (some nil? [text author])
+      (log/debugf "This parsed comment: %s \n\n doesnt have text and/or author!" comment)
+      (do
+        (log/debugf "Handling comment, commented by user: %s" author)
+        (log/debugf "Comment text is: %s" text)
+        (store-comment comment (is-spam? text author))))))
 
 (defn comment->id-text-pair
   "returns a simple object formatted to better spit to file"
@@ -70,18 +76,6 @@
 ;;   []
 ;;   "")
 
-(defn handle-comment
-  "Store comment into spam-queue or whitelist queue."
-  [comment]
-  (let [text (get-in (first sc) ["snippet" "topLevelComment" "snippet" "textOriginal"])
-        author (get-in comment ["snippet" "topLevelComment" "snippet" "authorDisplayName"])]
-    (if (some nil? [text author])
-      (log/debugf "This parsed comment: %s \n\n doesnt have text and/or author!" comment)
-      (do
-        (log/debugf "Handling comment, commented by user: %s" author)
-        (log/debugf "Comment text is: %s" text)
-        (store-comment comment (is-spam? text author))))))
-
 (defmulti str-in?
   (fn [in store]
     (type store)))
@@ -101,16 +95,25 @@
    (some #(str-in? text %) (:spam blacklist))))
 
 (defn handle-all-videos
-  "call yt api for videos, then continually call parse-videos on the set of results,
+  "Call yt api for videos, then continually call parse-videos on the set of results,
   by using the nextPageToken if its available on response body
   'UC-lHJZR3Gqxm24_Vd_AJ5Yw'"
-  [channel-id]
-  ;; TODO: go to all pages if there are more videos...
-  (parse-videos (yt/search-videos channel-id)))
+  ([channel-id page-token]
+   (let [[videos next-page-token] (yt/search-videos channel-id page-token)]
+     (parse-videos videos)
+     (when next-page-token
+       (handle-all-videos channel-id next-page-token))))
+  ([channel-id]
+   (handle-all-videos channel-id nil)))
 
-;; (defn handle-all-comments
-;;   "call yt api for videos, and use in handle-video to contunually query for all comments,
-;;   and be able to report from all of them. by using nextPageToken if its available
-;;   in response body."
-;;   []
-;;   "")
+(defn handle-all-comments
+  "call yt api for videos, and use in handle-video to contunually query for all comments,
+  and be able to report from all of them. by using nextPageToken if its available
+  in response body."
+  ([video-id page-token]
+   (let [[comments next-page-token] (yt/get-video-commentThreads video-id page-token)]
+     (parse-comments comments)
+     (when next-page-token
+       (handle-all-comments video-id next-page-token))))
+  ([video-id]
+   (handle-all-comments video-id nil)))

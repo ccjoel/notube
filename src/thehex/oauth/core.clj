@@ -4,14 +4,13 @@
             [taoensso.timbre :as log]))
 
 (defn -main
-  "FIXME"
+  ""
   [& args]
-  (log/info "Starting oauth core -main")
+  (log/info "Starting oauth core -main: populate tokens!")
   (oauth/populate-tokens!))
 
-;; Token-map new value: {
-;;                       "access_token" : "ya29.Glv1A7u27r7FdPdD8DvLNPGjdcUg9Q_-WdqEwHw9qdhIV_buHKNyNjGTb5gBIDZD_7dBKA_5AQj11cIbkMMf6gOLm5-sM_9sE6VaWq-90zeS4gaMmocU5BmQmkDz",
-;;                       "expires_in" : 3600,
-;;                       "refresh_token" : "1/0DfX-0Jr-1aSrr1HvrdrLVBGfPa6bF3lQvT6e9FkSFw",
-;;                       "token_type" : "Bearer"
-;;                       }
+(defn refresh
+  ""
+  [& args]
+  (log/info "refresing token")
+  (oauth/refresh (:refresh-token (oauth/read-persisted-tokens))))

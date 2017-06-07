@@ -109,7 +109,7 @@
   ""
   [tokens-map]
   (log/debug "Storing tokens map into tokens.edn")
-  (log/debug (str "Token map atom res: " tokens-map))
+  (log/debugf "Token map atom res: %s" tokens-map)
   (spit (util/with-abs-path "tokens.edn")
         (let [as-json (json/read-str tokens-map)]
           (str {:access-token (get as-json "access_token")
@@ -128,11 +128,11 @@
   (log/debug (str "Start server res: " (start-server!)))
   (browser/browse-url (authorization-uri oauth2-params))
   ;; TODO: set a timeout here just in case user doesnt log in
-  (log/debug "Awaiting code-map from creds channel")
+  (log/debug "Awaiting code from creds channel")
   (let [go-chan (go
-                  (let [code-map (<! creds-chan)]
-                    (log/trace "Got code-map from creds channel: " code-map)
-                    (let [token-res (fetch-tokens! code-map)]
+                  (let [code (<! creds-chan)]
+                    (log/trace "Got code from creds channel: " code)
+                    (let [token-res (fetch-tokens! code)]
                       (if (get token-res "error")
                         (do
                           (log/debug "Received error on token response..not updating nor persisting token map")
@@ -141,17 +141,7 @@
                     (stop-server!)))]
     (<!! go-chan)))
 
-;; (defn endpoint-call
-;;   ""
-;;   [endpoint-url access-token refresh-token]
-;;   (try+
-;;    (and (endpoint-url access-token)
-;;         [access-token refresh-token])
-;;    (catch [:status 401] _ (refresh-tokens refresh-token))))
-
-;; TODO: macro to wrap all catch 401 unauthorized from youtube api oauth calls?
-
-;; TODO: test and modify this function
+;; TODO: try this fn out, when access token expired.
 (defn refresh-tokens!
   "Request a new access token
   Note that there are limits on the number of refresh tokens that will be issued;
@@ -163,14 +153,25 @@
   (log/trace (str "Refreshing access token with refresh-token:" refresh-token))
   (try+
    (let [body (:body @(http/post (:access-token-uri oauth2-params)
-                                {:form-params {:grant_type       "refresh_token"
-                                               :refresh_token    refresh-token
-                                               :client_id (:client-id oauth2-params)
-                                               :client_secret (:client-secret oauth2-params)}}))
-         as-json (json/read-str body)]
-     (log/trace "Refresh-tokens response body:" as-json)
-     [(get as-json "access_token") refresh-token])
+                                 {:form-params {:grant_type       "refresh_token"
+                                                :refresh_token    refresh-token
+                                                :client_id (:client-id oauth2-params)
+                                                :client_secret (:client-secret oauth2-params)}}))
+         as-json (json/read-string body)]
+     (log/tracef "Refresh-tokens response body: " body)
+     (persist-tokens! (reset! token-map {"access_token" (get as-json "access_token")
+                                         "refresh_token" refresh-token})))
    (catch [:status 401]
        ;; TODO: do something if refresh token has expired or otherwise lost...
-       ;; like do the oauth login process again?
-       e (log/error (str "Received unauthorized 401 while trying to refresh tokens" e)))))
+       ;; maybe start the oauth login process again?
+       e (log/errorf "Received unauthorized 401 while trying to refresh tokens: %s" e))))
+
+;; TODO: macro to wrap all catch 401 unauthorized from youtube api oauth calls?
+;; something like:
+;; (defn endpoint-call
+;;   ""
+;;   [endpoint-url access-token refresh-token]
+;;   (try+
+;;    (and (endpoint-url access-token)
+;;         [access-token refresh-token])
+;;    (catch [:status 401] _ (refresh-tokens refresh-token))))

@@ -1,7 +1,7 @@
 #!/usr/bin/env boot
 
 (def project 'notube)
-(def version "0.1.0")
+(def version "0.1.1")
 
 (set-env!
  :resource-paths #{"resources" "src"}
@@ -38,14 +38,27 @@
   (let [dir (if (seq dir) dir #{"target"})]
     (comp (aot) (pom) (uber) (jar) (target :dir dir))))
 
-(deftask run
-  "Run the project."
+(deftask access
+  "Start server and prompt user, to store access token"
   [a args ARG [str] "the arguments for the application."]
   (require '[thehex.oauth.core :as app])
   (apply (resolve 'app/-main) args))
 
+(deftask refresh
+  "refresh access token"
+  [a args ARG [str] "arguments for refresh"]
+  (require '[thehex.oauth.core :as app])
+  (apply (resolve 'app/refresh) args))
+
 (require '[adzerk.boot-test :refer [test]])
 
-(defn -main [& args]
+(defn -main
+  "This will run when executing this file directly i.e. ./build.boot"
+  [& args]
   (require 'thehex.notube.core)
   (apply (resolve 'thehex.notube.core/-main) args))
+
+(deftask run
+  "Run the project."
+  []
+  (-main))

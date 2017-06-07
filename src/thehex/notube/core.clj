@@ -125,3 +125,8 @@
        (handle-all-comments video-id next-page-token))))
   ([video-id]
    (handle-all-comments video-id nil)))
+
+(defn -main
+  "This will try to get all comments for all videos for a given channel id"
+  [& args]
+  (handle-all-channel-videos (first args)))

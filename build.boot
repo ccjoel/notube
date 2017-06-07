@@ -38,27 +38,29 @@
   (let [dir (if (seq dir) dir #{"target"})]
     (comp (aot) (pom) (uber) (jar) (target :dir dir))))
 
-(deftask access
-  "Start server and prompt user, to store access token"
-  [a args ARG [str] "the arguments for the application."]
-  (require '[thehex.oauth.core :as app])
-  (apply (resolve 'app/-main) args))
-
-(deftask refresh
-  "refresh access token"
-  [a args ARG [str] "arguments for refresh"]
-  (require '[thehex.oauth.core :as app])
-  (apply (resolve 'app/refresh) args))
-
 (require '[adzerk.boot-test :refer [test]])
 
 (defn -main
-  "This will run when executing this file directly i.e. ./build.boot"
+  ;; "This will run when executing this file directly i.e. ./build.boot"
+  "This will refresh access tokens... should change to run main dev app
+   after handling main correctly"
   [& args]
   (require 'thehex.notube.core)
-  (apply (resolve 'thehex.notube.core/-main) args))
+  (apply (resolve 'thehex.oauth.core/-main) args))
 
 (deftask run
   "Run the project."
-  []
-  (-main))
+  [a args ARG [str] "the arguments for the application."]
+  (apply -main args))
+
+;; (deftask access
+;;   "Start server and prompt user, to store access token"
+;;   [a args ARG [str] "the arguments for the application."]
+;;   (require '[thehex.oauth.core :as app])
+;;   (apply (resolve 'app/-main) args))
+
+;; (deftask refresh
+;;   "refresh access token"
+;;   [a args ARG [str] "arguments for refresh"]
+;;   (require '[thehex.oauth.core :as app])
+;;   (apply (resolve 'app/refresh) args))

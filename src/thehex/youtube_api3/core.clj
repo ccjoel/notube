@@ -10,13 +10,10 @@
 
 ;; - Specific Comment by Id
 ;; https://www.googleapis.com/youtube/v3/comments?id=z124jjhzrlfitdvcw23xfzyrdya4ij0kj&part=snippet&key=
-
 ;; - Video info (statistics.. change part to get different info)
 ;; https://www.googleapis.com/youtube/v3/videos?part=statistics&id=UTXCu1VQDRw&key=
-
 ;; - Search all videos of pewdiepie's channel, ordered by date, newest first
 ;; https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&order=date&key=
-
 ;; With OAUTH and logged in w/ youtube user:
 ;; POST https://www.googleapis.com/youtube/v3/commenThreads?part=snippet&key=
 ;; post raw json body:
@@ -69,7 +66,7 @@
 
 (defn get-video-commentThreads
   " https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=UTXCu1VQDRw&key=
-  Use like: (get-video-commentThreads 84389473498348)
+  Use like: (get-video-commentThreads  \"d2dNb0wdJF0\")
   "
   ([video-id page-token]
    (try+
@@ -145,6 +142,3 @@
    (catch [:status 400] e (log/error e) false)
    (catch [:status 403] e (log/error e) false)
    (catch [:status 404] e (log/error e) false)))
-
-;; (get-video-commentThreads api-key "d2dNb0wdJF0")
-;; (search-videos api-key "UC-lHJZR3Gqxm24_Vd_AJ5Yw")

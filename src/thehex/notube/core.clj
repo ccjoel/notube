@@ -26,21 +26,21 @@
   "Loop through videos, find all comment threads, scan each,
   store bad ones on a file... "
   [videos]
-  ;; for now, parse only one video. we'll later call a doseq etc to handle all of them
-  (pmap handle-video videos))
+  (log/debugf "in parse-videos, doseq handle-video")
+  (doseq [video videos] (handle-video video)))
 
 (defn handle-video
   [video]
-  (log/infof "Handling a video for channel: %s" (get video "channelTitle"))
-  (log/debugf "Handling video with title: %s\n" (get video "title"))
-  (let [video-id (get (get video "id") "videoId")
-        next-page-token (get video "")]
-    (handle-all-comments video-id)))
+  (log/infof "Handling a video for channel: %s and title: %s"
+             (get video "channelTitle")
+             (get video "title"))
+  (let [video-id (get (get video "id") "videoId")]
+    (future (handle-all-comments video-id))))
 
 (defn parse-comments
   "loop through all comments from one page"
   [comments]
-  (log/debugf "in parse-comments, map handle-comment")
+  (log/debugf "in parse-comments, doseq handle-comment")
   (doseq [comment comments] (handle-comment comment)))
 
 (defn handle-comment
@@ -97,33 +97,31 @@
   (log/debug "deciding if its spam")
   (or
    (some #(= (clojure.string/lower-case author) (clojure.string/lower-case %)) (:users blacklist))
-   (some #(str-in? text %) (:spam blacklist))))
+   (some #(str-in? text %) (:spam blacklist))
+   (some #(str-in? text %) (:bullying blacklist))
+   (some #(str-in? text %) (:hate-speech blacklist))))
 
 (defn handle-all-videos
-  "Call yt api for videos, then continually call parse-videos on the set of results,
+  "Call youtube api for videos, then continually call parse-videos on the set of results,
   by using the nextPageToken if its available on response body
   'UC-lHJZR3Gqxm24_Vd_AJ5Yw'"
   ([channel-id page-token]
    (let [[videos next-page-token] (yt/search-videos channel-id page-token)]
-     (parse-videos videos)
+     (future (parse-videos videos))
      (when next-page-token
        (handle-all-videos channel-id next-page-token))))
   ([channel-id]
    (handle-all-videos channel-id nil)))
 
 (defn handle-all-comments
-  "call yt api for videos, and use in handle-video to continually query for all comments,
+  "Call yt api for videos, and use in handle-video to continually query for all comments,
   and be able to report from all of them. by using nextPageToken if its available
   in response body."
   ([video-id page-token]
    (let [[comments next-page-token] (yt/get-video-commentThreads video-id page-token)]
      (future (parse-comments comments))
-
-     ;; disable in the meantime. TODO: enable this:
-     ;; (when next-page-token
-     ;;   (log/debugf "next page token for comments for same video id!")
-     ;;   (handle-all-comments video-id next-page-token))
-
-     ))
+     (when next-page-token
+       (log/debugf "next page token for comments for same video id!")
+       (handle-all-comments video-id next-page-token))))
   ([video-id]
    (handle-all-comments video-id nil)))

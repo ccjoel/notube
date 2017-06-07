@@ -101,7 +101,7 @@
    (some #(str-in? text %) (:bullying blacklist))
    (some #(str-in? text %) (:hate-speech blacklist))))
 
-(defn handle-all-videos
+(defn handle-all-channel-videos
   "Call youtube api for videos, then continually call parse-videos on the set of results,
   by using the nextPageToken if its available on response body
   'UC-lHJZR3Gqxm24_Vd_AJ5Yw'"
@@ -109,9 +109,9 @@
    (let [[videos next-page-token] (yt/search-videos channel-id page-token)]
      (future (parse-videos videos))
      (when next-page-token
-       (handle-all-videos channel-id next-page-token))))
+       (handle-all-channel-videos channel-id next-page-token))))
   ([channel-id]
-   (handle-all-videos channel-id nil)))
+   (handle-all-channel-videos channel-id nil)))
 
 (defn handle-all-comments
   "Call yt api for videos, and use in handle-video to continually query for all comments,

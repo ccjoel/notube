@@ -78,9 +78,8 @@
                    (when page-token
                      (str "&pageToken=" page-token)))
           body (-> (http/get url {:as :json}) :body)]
-      (log/debug (str "Got videos from search: " body))
+      (log/tracef "Got comments from search: %s" body)
       (let [as-json (json/read-str body)]
-        (log/trace "Got comments for a video..")
         [(get as-json "items") (get as-json "nextPageToken")]))
     (catch [:status 401] e (log/error e))))
   ([video-id]

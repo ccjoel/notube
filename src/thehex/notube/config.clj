@@ -8,7 +8,7 @@
    [taoensso.timbre.appenders.core :as appenders]))
 
 (def timbre-config
-  {:level :trace  ; e/o #{:trace :debug :info :warn :error :fatal :report}
+  {:level :debug  ; e/o #{:trace :debug :info :warn :error :fatal :report}
    ;; Control log filtering by namespaces/patterns. Useful for turning off
    ;; logging in noisy libraries, etc.:
    ;;    :ns-whitelist  [] #_["my-app.foo-ns"]

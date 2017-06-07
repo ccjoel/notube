@@ -12,8 +12,9 @@
 (declare parse-comments
          handle-comment
          handle-video
-         is-spam?
-         report-comment)
+         handle-all-comments
+         store-comment
+         is-spam?)
 
 (def blacklist (edn/read-string
                 (slurp (clojure.java.io/resource "blacklist.edn"))))
@@ -26,7 +27,7 @@
   store bad ones on a file... "
   [videos]
   ;; for now, parse only one video. we'll later call a doseq etc to handle all of them
-  (map handle-video videos))
+  (pmap handle-video videos))
 
 (defn handle-video
   [video]
@@ -39,11 +40,13 @@
 (defn parse-comments
   "loop through all comments from one page"
   [comments]
-  (map handle-comment comments))
+  (log/debugf "in parse-comments, map handle-comment")
+  (doseq [comment comments] (handle-comment comment)))
 
 (defn handle-comment
   "Store comment into spam-queue or whitelist queue."
   [comment]
+  (log/debug "handling one comment in handle-comment")
   (let [text (get-in comment ["snippet" "topLevelComment" "snippet" "textOriginal"])
         author (get-in comment ["snippet" "topLevelComment" "snippet" "authorDisplayName"])]
     (if (some nil? [text author])
@@ -67,6 +70,7 @@
   We'll either store to spam queue, ot to a whitelist queue to check for false
   negatives + find new spam sources."
   [comment is-spam]
+  (log/debug "storing comment")
   (spit (util/with-abs-path (if is-spam "spam-queue" "white-queue"))
         (str (comment->id-text-pair comment) "\n")
         :append true))
@@ -90,6 +94,7 @@
   "Receives a comment text, and an author name, and return true if spam,
   dictated by the terms under blacklist.edn"
   [text author]
+  (log/debug "deciding if its spam")
   (or
    (some #(= (clojure.string/lower-case author) (clojure.string/lower-case %)) (:users blacklist))
    (some #(str-in? text %) (:spam blacklist))))
@@ -107,13 +112,18 @@
    (handle-all-videos channel-id nil)))
 
 (defn handle-all-comments
-  "call yt api for videos, and use in handle-video to contunually query for all comments,
+  "call yt api for videos, and use in handle-video to continually query for all comments,
   and be able to report from all of them. by using nextPageToken if its available
   in response body."
   ([video-id page-token]
    (let [[comments next-page-token] (yt/get-video-commentThreads video-id page-token)]
-     (parse-comments comments)
-     (when next-page-token
-       (handle-all-comments video-id next-page-token))))
+     (future (parse-comments comments))
+
+     ;; disable in the meantime. TODO: enable this:
+     ;; (when next-page-token
+     ;;   (log/debugf "next page token for comments for same video id!")
+     ;;   (handle-all-comments video-id next-page-token))
+
+     ))
   ([video-id]
    (handle-all-comments video-id nil)))

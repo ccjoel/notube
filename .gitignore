@@ -6,3 +6,4 @@ notube.log
 tokens.edn
 config.edn
 spam-queue
+white-queue

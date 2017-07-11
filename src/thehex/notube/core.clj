@@ -7,8 +7,6 @@
    [thehex.oauth.lib :as oauth])
   (:gen-class))
 
-(println "loading ..... thehex.notube.core yo!")
-
 (declare parse-comments
          handle-comment
          handle-video
@@ -129,4 +127,7 @@
 (defn -main
   "This will try to get all comments for all videos for a given channel id"
   [& args]
-  (handle-all-channel-videos (first args)))
+  (try
+    (handle-all-channel-videos (first args))
+    (catch Exception e
+      (log/error e "Error handling all videos."))))

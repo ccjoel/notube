@@ -157,7 +157,7 @@
                                                 :refresh_token    refresh-token
                                                 :client_id (:client-id oauth2-params)
                                                 :client_secret (:client-secret oauth2-params)}}))
-         as-json (json/read-string body)]
+         as-json (json/read-str body)]
      (log/tracef "Refresh-tokens response body: " body)
      (persist-tokens! (reset! token-map {"access_token" (get as-json "access_token")
                                          "refresh_token" refresh-token})))

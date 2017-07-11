@@ -16,6 +16,7 @@
                  [compojure "1.5.2"]
                  [com.taoensso/timbre "4.8.0"]
                  [org.clojure/core.async "0.2.395"]
+                 [org.clojure/tools.cli "0.3.5"]
                  [org.clojure/tools.nrepl "0.2.12"]
                  [org.clojure/data.json "0.2.6"] ;; parse json api responses
                  [slingshot "0.12.2"]])
@@ -29,7 +30,7 @@
       :scm         {:url "https://github.com/teh0xqb/notube"}
       :license     {"Eclipse Public License"
                     "http://www.eclipse.org/legal/epl-v10.html"}}
- jar {:main        'thehex.notube.core
+ jar {:main        'thehex.notube.cli
       :file        (str "notube-" version ".jar")})
 
 (deftask build
@@ -45,22 +46,10 @@
   "This will refresh access tokens... should change to run main dev app
    after handling main correctly"
   [& args]
-  (require 'thehex.notube.core)
-  (apply (resolve 'thehex.oauth.core/-main) args))
+  (require 'thehex.notube.cli)
+  (apply (resolve 'thehex.notube.cli/-main) args))
 
 (deftask run
   "Run the project."
   [a args ARG [str] "the arguments for the application."]
   (apply -main args))
-
-;; (deftask access
-;;   "Start server and prompt user, to store access token"
-;;   [a args ARG [str] "the arguments for the application."]
-;;   (require '[thehex.oauth.core :as app])
-;;   (apply (resolve 'app/-main) args))
-
-;; (deftask refresh
-;;   "refresh access token"
-;;   [a args ARG [str] "arguments for refresh"]
-;;   (require '[thehex.oauth.core :as app])
-;;   (apply (resolve 'app/refresh) args))

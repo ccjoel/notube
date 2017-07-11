@@ -29,11 +29,21 @@
 ;;   }
 ;; }
 
-(def tokens (oauth/read-persisted-tokens))
+(def tokens (atom nil))
 
-(def api-key (->
-              (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
-              :api-key))
+(try
+  (reset! tokens (oauth/read-persisted-tokens))
+  (catch Exception e
+    (log/error e "\nUnable to initially load tokens. Probably file not found...")))
+
+(def api-key (atom nil))
+
+(try
+  (reset! api-key (->
+                   (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
+                   :api-key))
+  (catch java.lang.IllegalArgumentException e
+    (log/error e "Please copy config.sample.edn file into config.edn and set youtube api app settings.")))
 
 (defn get-user-channels
   " Example...
@@ -48,7 +58,7 @@
    (let [url (str config/api-base "channels?part=id&mine=true")
          body (-> (http/get url
                             {:headers {:Authorization
-                                       (str "Bearer " (:access-token tokens))}
+                                       (str "Bearer " (:access-token @tokens))}
                              :as :json})
                   :body ;; body is json
                   ;; TODO: parse response json to actually get info
@@ -71,7 +81,7 @@
   ([video-id page-token]
    (try+
     (let [url (str config/api-base "commentThreads?part=snippet&videoId="
-                   video-id "&order=time&key=" api-key
+                   video-id "&order=time&key=" @api-key
                    (when page-token
                      (str "&pageToken=" page-token)))
           body (-> (http/get url {:as :json}) :body)]
@@ -92,7 +102,7 @@
   another channel id = UC4u8goEsLgpPvDX2mKD70nQ"
   ([channel-id page-token]
    (let [url (str config/api-base "activities?part=snippet&channelId=" channel-id
-                  "&key=" api-key (when page-token (str "&pageToken=" page-token)))
+                  "&key=" @api-key (when page-token (str "&pageToken=" page-token)))
          body (-> (http/get url {:as :json}) :body)]
      (log/debug (str "Got activites: " body))
      body))
@@ -110,7 +120,7 @@
   "
   ([channel-id page-token]
    (let [url (str config/api-base "search?part=snippet&channelId=" channel-id
-                  "&key=" api-key "&order=date"
+                  "&key=" @api-key "&order=date"
                   (when page-token
                     (str "&pageToken=" page-token)))
          body (-> (http/get url {:as :json}) :body)]
@@ -133,7 +143,7 @@
    (let [url (str config/api-base "comments/markAsSpam?id=" comment-id)
          res (http/post url
                         {:headers {:Authorization
-                                   (str "Bearer " (:access-token tokens))}
+                                   (str "Bearer " (:access-token @tokens))}
                          :as :json})]
      (log/info "Sucessfully reported comment as spam, with result: ")
      (log/debug (str res)) ;; (:status res) == 204 no content

@@ -8,7 +8,7 @@
    [taoensso.timbre.appenders.core :as appenders]))
 
 (def timbre-config
-  {:level :debug  ; e/o #{:trace :debug :info :warn :error :fatal :report}
+  {:level :trace  ; e/o #{:trace :debug :info :warn :error :fatal :report}
    ;; Control log filtering by namespaces/patterns. Useful for turning off
    ;; logging in noisy libraries, etc.:
    ;;    :ns-whitelist  [] #_["my-app.foo-ns"]
@@ -22,6 +22,3 @@
    :appenders {:spit (appenders/spit-appender {:fname (util/with-abs-path "notube.log")})}})
 
 (timbre/merge-config! timbre-config)
-
-(println "loading... notubes' config yo!")
-

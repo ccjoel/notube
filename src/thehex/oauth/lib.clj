@@ -16,17 +16,28 @@
 
 (def server-port 8893)
 
-(def oauth2-params
-  {:client-id (System/getenv "YOUTUBE_CLIENT_ID")
-   :client-secret (System/getenv "YOUTUBE_CLIENT_SECRET")
-   :authorize-uri  "https://accounts.google.com/o/oauth2/auth"
-   ;; google will append code= grab this query param on server
-   :redirect-uri (format "http://127.0.0.1:%s/oauth2" server-port) ;; or #error hash if failed or not authorized
-   :access-token-uri "https://accounts.google.com/o/oauth2/token"
-   :scope "https://www.googleapis.com/auth/youtube.force-ssl"})
+;; TODO: clean the getenv/ or config.edn thing up. maybe use the environ lib which I can use stuff set on profiles OR env var..
+(try
+  (def oauth2-params
+    {:client-id (or (System/getenv "YOUTUBE_CLIENT_ID")
+                    (:youtube-client-id (edn/read-string
+                                         (slurp (clojure.java.io/resource "config.edn")))))
+     :client-secret (or (System/getenv "YOUTUBE_CLIENT_SECRET")
+                        (:youtube-client-secret (edn/read-string
+                                                 (slurp (clojure.java.io/resource "config.edn")))))
+     :authorize-uri  "https://accounts.google.com/o/oauth2/auth"
+     ;; google will append code= grab this query param on server
+     :redirect-uri (format "http://127.0.0.1:%s/oauth2" server-port) ;; or #error hash if failed or not authorized
+     :access-token-uri "https://accounts.google.com/o/oauth2/token"
+     :scope "https://www.googleapis.com/auth/youtube.force-ssl"})
+  (catch Exception e
+    (log/debug e "Check oauth2-params on oauth.lib")
+    (log/error "No youtube client id or secret on environment var, nor on resources/config.edn")))
 
 (defonce server (atom nil))
 (def creds-chan (chan))
+
+;; we have a token map here, and a token map param when we persist. maybe we can remove and stop using this?
 (def token-map (atom nil))
 
 (compojure/defroutes all-routes
@@ -35,7 +46,7 @@
     (log/debug "handling oauth2 endpoint...")
     (let [code (get params "code")]
       (log/debug "got code on /ouath2 endpoint")
-      ;; TODO: set timeout for if user doesnt authenticate?
+      ;; TODO: set timeout for if user doesnt authenticate? can then stop all this (close channel) and stop server
       (do
         (log/trace (str "Putting code in creds-chan inside async/go: " code))
         (>!! creds-chan code)
@@ -63,8 +74,7 @@
   ""
   []
   (log/debug (str "Starting Server on port " server-port " to catch oath code"))
-  (reset! server (web/run-server (handler/site #'all-routes) {:port server-port}))
-  true)
+  (reset! server (web/run-server (handler/site #'all-routes) {:port server-port})))
 
 (defn stop-server!
   "Gracefully shutdown server: wait 100ms for existing requests to be finished
@@ -106,14 +116,16 @@
       (log/error (str e)))))
 
 (defn persist-tokens!
-  ""
+  "Persist tokens in tokens.edn file. Receives a stringified json."
   [tokens-map]
   (log/debug "Storing tokens map into tokens.edn")
   (log/debugf "Token map atom res: %s" tokens-map)
-  (spit (util/with-abs-path "tokens.edn")
-        (let [as-json (json/read-str tokens-map)]
-          (str {:access-token (get as-json "access_token")
-                :refresh-token (get as-json "refresh_token")}))))
+  (try (spit (util/with-abs-path "tokens.edn")
+             (let [as-json (json/read-str tokens-map)]
+               (str {:access-token (get as-json "access_token")
+                     :refresh-token (get as-json "refresh_token")})))
+       (catch java.lang.ClassCastException e
+         (log/error e "Did not send a json string to persist!"))))
 
 (defn read-persisted-tokens
   ""
@@ -141,7 +153,6 @@
                     (stop-server!)))]
     (<!! go-chan)))
 
-;; TODO: try this fn out, when access token expired.
 (defn refresh-tokens!
   "Request a new access token
   Note that there are limits on the number of refresh tokens that will be issued;
@@ -149,22 +160,24 @@
   You should save refresh tokens in long-term storage and continue to use them as long as they remain valid.
   If your application requests too many refresh tokens, it may run into these limits,
   in which case older refresh tokens will stop working."
-  [refresh-token]
-  (log/trace (str "Refreshing access token with refresh-token:" refresh-token))
-  (try+
-   (let [body (:body @(http/post (:access-token-uri oauth2-params)
-                                 {:form-params {:grant_type       "refresh_token"
-                                                :refresh_token    refresh-token
-                                                :client_id (:client-id oauth2-params)
-                                                :client_secret (:client-secret oauth2-params)}}))
-         as-json (json/read-str body)]
-     (log/tracef "Refresh-tokens response body: " body)
-     (persist-tokens! (reset! token-map {"access_token" (get as-json "access_token")
-                                         "refresh_token" refresh-token})))
-   (catch [:status 401]
-       ;; TODO: do something if refresh token has expired or otherwise lost...
-       ;; maybe start the oauth login process again?
-       e (log/errorf "Received unauthorized 401 while trying to refresh tokens: %s" e))))
+  []
+  (let [refresh-token (get (read-persisted-tokens) :refresh-token)]
+    (log/trace (str "Refreshing access token with refresh-token:" refresh-token))
+    (try+
+     (let [{:keys [status headers error body]} @(http/post (:access-token-uri oauth2-params)
+                                                           {:form-params {:grant_type       "refresh_token"
+                                                                          :refresh_token    refresh-token
+                                                                          :client_id (:client-id oauth2-params)
+                                                                          :client_secret (:client-secret oauth2-params)}})
+           as-json (json/read-str body)]
+       (log/debugf "status: %s, error: %s, body: %s" status error body)
+       (log/debugf "Refresh-tokens response as-json: " as-json)
+       (persist-tokens! (reset! token-map (json/write-str {"access_token" (get as-json "access_token")
+                                                           "refresh_token" refresh-token}))))
+     (catch [:status 401]
+         ;; TODO: do something if refresh token has expired or otherwise lost...
+         ;; maybe start the oauth login process again?
+         e (log/errorf "Received unauthorized 401 while trying to refresh tokens: %s" e)))))
 
 ;; TODO: macro to wrap all catch 401 unauthorized from youtube api oauth calls?
 ;; something like:

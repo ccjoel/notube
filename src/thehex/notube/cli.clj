@@ -6,9 +6,10 @@
             [taoensso.timbre :as log])
   (:gen-class))
 
+;; TODO: maybe -p and -r for populate/refresh. instead of -t then p ir r...
 (def cli-options
   [;; login and populate tokens, or refresh access token
-   ["-t" "--tokens ACTION" "Populate or refresh tokens"
+   ["-t" "--tokens ACTION" "Populate or refresh tokens. Action can be either p o r"
     :id :tokenaction
     :validate [#(or (= "r" %) (= "p" %))]]
    ;; ["-v" nil "Verbosity level"
@@ -21,27 +22,14 @@
    ;; A boolean option defaulting to nil
    ["-h" "--help"]])
 
+;; TODO: later... possibly doesnt need to be the main app, specially since core.clj could call parse-opts args...
 (defn -main [& args]
   (let [clargs (parse-opts args cli-options)
         opts (:options clargs)]
     (cond
       (:errors clargs) (doseq [e (:errors clargs)] (println e))
       (= (:tokenaction opts) "p") (oauth/populate-tokens!)
-      (= (:tokenaction opts) "r") (log/info "should refresh access token")
+      (= (:tokenaction opts) "r") (oauth/refresh-tokens!)
       (:notube opts) (notube/handle-all-channel-videos)
       (:report opts) (log/info "should report spam queue with youtube api")
       :else (log/infof "Received these args: %s.\n Summary:\n %s" args (:summary clargs)))))
-
-
-;; (def clargs '("-t" "r"))
-;; Execute the command line:
-;; my-program -vvvp8080 foo --help --invalid-opt
-;; to produce the map:
-;; {:options   {:port 8080
-;;              :verbosity 3
-;;              :help true}
-;;  :arguments ["foo"]
-;;  :summary   "  -p, --port PORT  80  Port number
-;;                -v                   Verbosity level
-;;                -h, --help"
-;;  :errors    ["Unknown option: \"--invalid-opt\""]}

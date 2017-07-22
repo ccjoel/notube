@@ -145,10 +145,9 @@
                         {:headers {:Authorization
                                    (str "Bearer " (:access-token @tokens))}
                          :as :json})]
-     (log/info "Sucessfully reported comment as spam, with result: ")
-     (log/debug (str res)) ;; (:status res) == 204 no content
+     (log/info "Sucessfully reported comment as spam.")
      true)
-   (catch [:status 401] e (log/error e) false)
-   (catch [:status 400] e (log/error e) false)
-   (catch [:status 403] e (log/error e) false)
-   (catch [:status 404] e (log/error e) false)))
+   (catch [:status 401] e (log/error e "got 401 on report spam") false)
+   (catch [:status 400] e (log/error e "got 400 on report spam") false)
+   (catch [:status 403] e (log/error e "got 403 on report spam") false)
+   (catch [:status 404] e (log/error e "got 404 on report spam") false)))

@@ -124,10 +124,24 @@
   ([video-id]
    (handle-all-comments video-id nil)))
 
-(defn -main
-  "This will try to get all comments for all videos for a given channel id"
-  [& args]
-  (try
-    (handle-all-channel-videos (first args))
-    (catch Exception e
-      (log/error e "Error handling all videos."))))
+(defn report-spam-line
+  "Report only one spam line, which is a string with unparsed edn format. id is
+   of the form: {:id \"some-id\" :text \"text in comment\"}"
+  [edn-str-line]
+  (let [parsed (edn/read-string edn-str-line)]
+    (yt/report-comment-as-spam (:id parsed))
+    ;; then return text to print.. for now...
+    ;; TODO: remove the line parsed to not print anything. not needed, really
+    (:text parsed)))
+
+(defn report-spam-queue
+  "REPORTS ALL THE SPAM QUEUE WITH YOUTUBE API. Be Careful here."
+  []
+  (log/info "Reporting ALL SPAM msgs from spam queue!")
+  ;; TODO: maybe clear or do something to spam queue.. what happens if we try to report twice?
+  (let [file (util/with-abs-path "spam-queue")]
+    (util/process-file-by-lines file report-spam-line identity)))
+
+;; repl'ng: report this id...
+;; (yt/report-comment-as-spam
+;;   (:id (edn/read-string (first (line-seq (clojure.java.io/reader (util/with-abs-path "spam-queue")))))))

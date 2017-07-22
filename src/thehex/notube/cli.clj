@@ -6,7 +6,6 @@
             [taoensso.timbre :as log])
   (:gen-class))
 
-;; TODO: maybe -p and -r for populate/refresh. instead of -t then p ir r...
 (def cli-options
   [;; login and populate tokens, or refresh access token
    ["-t" "--tokens ACTION" "Populate or refresh tokens. Action can be either p o r"
@@ -30,6 +29,7 @@
       (:errors clargs) (doseq [e (:errors clargs)] (println e))
       (= (:tokenaction opts) "p") (oauth/populate-tokens!)
       (= (:tokenaction opts) "r") (oauth/refresh-tokens!)
-      (:notube opts) (notube/handle-all-channel-videos)
-      (:report opts) (log/info "should report spam queue with youtube api")
+      ;; TODO: dont just check videos from one channel...
+      (:notube opts) (notube/handle-all-channel-videos "UC-lHJZR3Gqxm24_Vd_AJ5Yw") ;; need to pass channel id
+      (:report opts) (notube/report-spam-queue)
       :else (log/infof "Received these args: %s.\n Summary:\n %s" args (:summary clargs)))))

@@ -11,9 +11,9 @@
                  [org.clojure/tools.nrepl "0.2.12"]
                  [javax.servlet/servlet-api "2.5"]
                  [ring/ring-devel "1.5.0"] ;; to restart server of each change for dev
-                 [clj-http "3.4.1"] ;; replace with http-kit client code
+                 [clj-http "3.4.1"] ;; TODO: replace with http-kit client code
                  [http-kit "2.2.0"] ;; for client and web server
-                 [compojure "1.5.2"]
+                 [compojure "1.5.2"] ;; simple route to populate tokens from google login
                  [com.taoensso/timbre "4.8.0"]
                  [org.clojure/core.async "0.2.395"]
                  [org.clojure/tools.cli "0.3.5"]

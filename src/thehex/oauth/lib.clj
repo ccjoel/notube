@@ -179,7 +179,7 @@
          ;; maybe start the oauth login process again?
          e (log/errorf "Received unauthorized 401 while trying to refresh tokens: %s" e)))))
 
-;; TODO: macro to wrap all catch 401 unauthorized from youtube api oauth calls?
+;; TODO: idea form website for later... macro to wrap all catch 401 unauthorized from youtube api oauth calls?
 ;; something like:
 ;; (defn endpoint-call
 ;;   ""

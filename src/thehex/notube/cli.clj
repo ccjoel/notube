@@ -25,7 +25,7 @@
    ;; A boolean option defaulting to nil
    ["-h" "--help"]])
 
-;; TODO: later... possibly doesnt need to be the main app, specially since core.clj could call parse-opts args...
+;; TODO: doesnt need to be the main app, could be a fn that core.clj calls
 (defn -main [& args]
   (let [clargs (parse-opts args cli-options)
         opts (:options clargs)]

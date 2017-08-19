@@ -35,7 +35,8 @@
 (try
   (reset! tokens (oauth/read-persisted-tokens))
   (catch Exception e
-    (log/error e "\nUnable to initially load tokens. Probably file not found...")))
+    (log/info "\nUnable to initially load tokens. Please create tokens.edn file by popoulating with `-t p`. you can also manually copy a previously known tokens.edn file to project root dir.")
+    (log/trace e)))
 
 (def api-key (atom nil))
 
@@ -44,7 +45,8 @@
                    (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
                    :api-key))
   (catch java.lang.IllegalArgumentException e
-    (log/error e "Please copy config.sample.edn file into config.edn and set youtube api app settings.")))
+    (log/error "Please copy config.sample.edn file into config.edn and set youtube api app settings.")
+    (log/trace e)))
 
 (defn get-user-channels
   " Example...

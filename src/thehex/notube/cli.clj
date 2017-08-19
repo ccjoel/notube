@@ -2,6 +2,7 @@
   (:require [clojure.tools.cli :refer [parse-opts]]
             [thehex.notube.util :as util]
             [thehex.notube.core :as notube]
+            [thehex.youtube-api3.core :as yt]
             [thehex.oauth.lib :as oauth]
             [taoensso.timbre :as log])
   (:gen-class))
@@ -16,8 +17,11 @@
    ;;  :default 0
    ;;  :assoc-fn (fn [m k _] (update-in m [k] inc))]
    ;; notube!
-   ["-n" "--notube" "Scan and populate spam queue"]
+   ["-n" "--notube CHANNELID" "Scan and populate spam queue"
+    :id :channel-id]
    ["-r" "--report" "Go through spam queue and report as spam"]
+   ["-s" "--search-channel CHANNEL-OR-USER-NAME" "Search users by name, receive channel id"
+    :id :username]
    ;; A boolean option defaulting to nil
    ["-h" "--help"]])
 
@@ -30,6 +34,7 @@
       (= (:tokenaction opts) "p") (oauth/populate-tokens!)
       (= (:tokenaction opts) "r") (oauth/refresh-tokens!)
       ;; TODO: dont just check videos from one channel...
-      (:notube opts) (notube/handle-all-channel-videos "UC-lHJZR3Gqxm24_Vd_AJ5Yw") ;; need to pass channel id
+      (:channel-id opts) (notube/handle-all-channel-videos (:channel-id opts)) ;; need to pass channel id
+      (:username opts) (yt/search-users (:username opts))
       (:report opts) (notube/report-spam-queue)
       :else (log/infof "Received these args: %s.\n Summary:\n %s" args (:summary clargs)))))

@@ -104,7 +104,7 @@
   by using the nextPageToken if its available on response body
   'UC-lHJZR3Gqxm24_Vd_AJ5Yw'"
   ([channel-id page-token]
-   (let [[videos next-page-token] (yt/search-videos channel-id page-token)]
+   (let [[videos next-page-token] (yt/search-channel-videos channel-id page-token)]
      (future (parse-videos videos))
      (when next-page-token
        (handle-all-channel-videos channel-id next-page-token))))

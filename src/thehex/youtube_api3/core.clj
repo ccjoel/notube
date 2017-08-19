@@ -48,7 +48,7 @@
     (log/error "Please copy config.sample.edn file into config.edn and set youtube api app settings.")
     (log/trace e)))
 
-(defn get-user-channels
+(defn get-my-channels
   " Example...
   The API supports two ways to specify an access token:
   1. curl -H \"Authorization: Bearer ACCESS_TOKEN\" https://www.googleapis.com/youtube/v3/channels?part=id&mine=true
@@ -112,10 +112,10 @@
   ([channel-id]
    (get-channel-activity channel-id nil)))
 
-(defn search-videos
+(defn search-channel-videos
   "Original Url: https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&key=
 
-  Use like: `(search-videos 'UC-lHJZR3Gqxm24_Vd_AJ5Yw')`
+  Use like: `(search-channel-videos 'UC-lHJZR3Gqxm24_Vd_AJ5Yw')`
   ^ pewds channel
 
   my channel= UC4-vzjcBolmvYWYP6ldbLbA
@@ -133,7 +133,29 @@
        (log/debugf "Total Results: %s, resultsPerPage: %s" (get page-info "totalResults") (get page-info "resultsPerPage"))
        [(get as-json "items") (get as-json "nextPageToken")])))
   ([channel-id]
-   (search-videos channel-id nil)))
+   (search-channel-videos channel-id nil)))
+
+(defn search-users
+  "Original Url: https://www.googleapis.com/youtube/v3/search?part=snippet&q=someusername&key=
+
+  Use like: `(search-users 'pewdiepie')`
+
+  my channel= UC4-vzjcBolmvYWYP6ldbLbA
+  another channel id = UC4u8goEsLgpPvDX2mKD70nQ
+  "
+  [query]
+  (let [url (str config/api-base "search?part=snippet&q=" query "&key=" @api-key)
+        body (-> (http/get url {:as :json}) :body)]
+    ;; (log/debug (str "Got videos from search: " body))
+    (let [as-json (json/read-str body)
+          page-info (get as-json "pageInfo")]
+      (log/debugf "Total Results: %s, resultsPerPage: %s" (get page-info "totalResults") (get page-info "resultsPerPage"))
+      (let [items (get as-json "items")]
+        (log/info (seq (map #(get (get % "id") "channelId")
+                              (filter (fn [item]
+                                        (let [id (get item "id")]
+                                          (= (get id "kind") "youtube#channel")))
+                                      items))))))))
 
 (defn report-comment-as-spam
   "Reports a comment as spam, provided a comment id.

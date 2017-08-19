@@ -1,18 +1,12 @@
 # NoTube
 
-FIXME: description
-
 ## Installation
-
-Download from http://example.com/FIXME.
 
 ## Usage
 
-FIXME: explanation
-
 Run the project directly:
 
-    $ boot run
+    $ build.boot -h
 
 Run the project's tests (they'll fail until you edit them):
 
@@ -29,20 +23,13 @@ or,
     $ ./run.sh
 
 ## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
+```
+  -t, --tokens ACTION                        Populate or refresh tokens. Action can be either p o r
+  -n, --notube CHANNELID                     Scan and populate spam queue
+  -r, --report                               Go through spam queue and report as spam
+  -s, --search-channel CHANNEL-OR-USER-NAME  Search users by name, receive channel id
+  -h, --help
+```
 
 ## License
 

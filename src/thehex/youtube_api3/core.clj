@@ -8,6 +8,7 @@
             [taoensso.timbre :as log])
   (:use [slingshot.slingshot :only [try+ throw+]]))
 
+;; SOME sample url and requests from youtube api... most implemented in actual file
 ;; - Specific Comment by Id
 ;; https://www.googleapis.com/youtube/v3/comments?id=z124jjhzrlfitdvcw23xfzyrdya4ij0kj&part=snippet&key=
 ;; - Video info (statistics.. change part to get different info)
@@ -60,8 +61,8 @@
                             {:headers {:Authorization
                                        (str "Bearer " (:access-token @tokens))}
                              :as :json})
-                  :body ;; body is json
-                  ;; TODO: parse response json to actually get info
+                  :body ;; TODO: body is json? or json str?
+                  ;; TODO:
                   ;; will receive a 401 HTTP unauthorize if the access token expired
                   ;;:user ... old example on getting data...
                   )

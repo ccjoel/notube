@@ -34,22 +34,18 @@
       :file        (str "notube-" version ".jar")})
 
 (deftask build
-  "Build the project locally as a JAR."
+  "Build the project locally as a production JAR.
+   For dev, just run ./build.boot -h, etc"
   [d dir PATH #{str} "the set of directories to write to (target)."]
+  (System/setProperty "prod" "true")
   (let [dir (if (seq dir) dir #{"target"})]
     (comp (aot) (pom) (uber) (jar) (target :dir dir))))
 
 (require '[adzerk.boot-test :refer [test]])
 
 (defn -main
-  ;; "This will run when executing this file directly i.e. ./build.boot"
-  "This will refresh access tokens... should change to run main dev app
-   after handling main correctly"
+  "This will run when executing this file directly i.e. ./build.boot
+   dev version. accepts command line args"
   [& args]
   (require 'thehex.notube.cli)
   (apply (resolve 'thehex.notube.cli/-main) args))
-
-(deftask run
-  "Run the project."
-  [a args ARG [str] "the arguments for the application."]
-  (apply -main args))

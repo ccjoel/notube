@@ -1,9 +1,21 @@
-(ns thehex.notube.util)
+(ns thehex.notube.util
+  (:require [clojure.edn :as edn]
+            [taoensso.timbre :as log]))
+
+(declare read-config-key)
+
+(def ^:const prod?
+  (boolean (System/getProperty "prod")))
 
 (defn with-abs-path
   "Gets absolute path of server file."
   [filename]
-  (str (.getCanonicalPath (clojure.java.io/file ".")) (java.io.File/separator) filename))
+  (str
+   (if prod?
+     (read-config-key :install-dir)
+     (.getCanonicalPath (clojure.java.io/file ".")))
+   (java.io.File/separator)
+   filename))
 
 (defn process-file-by-lines
   "Process file reading it line-by-line.
@@ -19,3 +31,10 @@
      (doseq [line (line-seq rdr)]
        (output-fn
         (process-fn line))))))
+
+(defn read-config-key
+  ""
+  [key]
+  (get
+   (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
+   key))

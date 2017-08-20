@@ -1,4 +1,8 @@
 {:port "8889"
  :api-key ""
  :youtube-client-id ""
- :youtube-client-secret ""}
+ :youtube-client-secret ""
+ :logfile-location "/Users/quiles/scripts"
+ ;; prod install directory
+ :install-dir "/Users/quiles/scripts"
+ :log-level "error"}

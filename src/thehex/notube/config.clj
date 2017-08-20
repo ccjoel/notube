@@ -7,6 +7,8 @@
    [thehex.notube.util :as util]
    [taoensso.timbre.appenders.core :as appenders]))
 
+;; TODO if prod / built change to error. if dev, either debug OR env var
+;; (to allow override to anything including trace)
 (def timbre-config
   {:level :trace  ; e/o #{:trace :debug :info :warn :error :fatal :report}
    ;; Control log filtering by namespaces/patterns. Useful for turning off

@@ -22,7 +22,7 @@
                  [slingshot "0.12.2"]])
 
 (task-options!
- aot {:namespace   #{'thehex.notube.core}}
+ aot {:namespace   #{'thehex.notube.cli}}
  pom {:project     project
       :version     version
       :description "Notube crawls Youtube Channels and reports/deletes comments that include spam, bullying, harrassment, hate, and violent speech."

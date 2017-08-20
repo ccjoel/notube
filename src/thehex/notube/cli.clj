@@ -37,4 +37,4 @@
       (:channel-id opts) (notube/handle-all-channel-videos (:channel-id opts)) ;; need to pass channel id
       (:username opts) (yt/search-users (:username opts))
       (:report opts) (notube/report-spam-queue)
-      :else (log/infof "Received these args: %s.\n Summary:\n %s" args (:summary clargs)))))
+      :else (log/infof "Received these args: %s.\n Summary:\n%s" args (:summary clargs)))))

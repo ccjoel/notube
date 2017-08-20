@@ -24,31 +24,25 @@
   "Loop through videos, find all comment threads, scan each,
   store bad ones on a file... "
   [videos]
-  (log/debugf "in parse-videos, doseq handle-video")
   (doseq [video videos] (handle-video video)))
 
 (defn handle-video
   [video]
-  (log/infof "Handling a video for channel: %s and title: %s"
-             (get video "channelTitle")
-             (get video "title"))
   (let [video-id (get (get video "id") "videoId")]
     (future (handle-all-comments video-id))))
 
 (defn parse-comments
   "loop through all comments from one page"
   [comments]
-  (log/debugf "in parse-comments, doseq handle-comment")
   (doseq [comment comments] (handle-comment comment)))
 
 (defn handle-comment
   "Store comment into spam-queue or whitelist queue."
   [comment]
-  (log/debug "handling one comment in handle-comment")
   (let [text (get-in comment ["snippet" "topLevelComment" "snippet" "textOriginal"])
         author (get-in comment ["snippet" "topLevelComment" "snippet" "authorDisplayName"])]
     (if (some nil? [text author])
-      (log/debugf "This parsed comment: %s \n\n doesnt have text and/or author!" comment)
+      (log/warnf "This parsed comment: %s \n\n doesnt have text and/or author!" comment)
       (do
         (log/debugf "Handling comment, commented by user: %s" author)
         (log/debugf "Comment text is: %s" text)
@@ -92,7 +86,6 @@
   "Receives a comment text, and an author name, and return true if spam,
   dictated by the terms under blacklist.edn"
   [text author]
-  (log/debug "deciding if its spam")
   (or
    (some #(= (clojure.string/lower-case author) (clojure.string/lower-case %)) (:users blacklist))
    (some #(str-in? text %) (:spam blacklist))
@@ -119,7 +112,6 @@
    (let [[comments next-page-token] (yt/get-video-commentThreads video-id page-token)]
      (future (parse-comments comments))
      (when next-page-token
-       (log/debugf "next page token for comments for same video id!")
        (handle-all-comments video-id next-page-token))))
   ([video-id]
    (handle-all-comments video-id nil)))
@@ -135,13 +127,19 @@
     (:text parsed)))
 
 (defn report-spam-queue
-  "REPORTS ALL THE SPAM QUEUE WITH YOUTUBE API. Be Careful here."
+  "REPORTS ALL THE SPAM QUEUE WITH YOUTUBE API. Be Careful here.
+   Use like:
+  (yt/report-comment-as-spam
+    (:id (edn/read-string (first (line-seq (clojure.java.io/reader (util/with-abs-path \"spam-queue\")))))))
+  "
   []
-  (log/info "Reporting ALL SPAM msgs from spam queue!")
   ;; TODO: maybe clear or do something to spam queue.. what happens if we try to report twice?
-  (let [file (util/with-abs-path "spam-queue")]
-    (util/process-file-by-lines file report-spam-line identity)))
+  (try
+    (let [file (util/with-abs-path "spam-queue")]
+      (log/info "Reporting ALL SPAM msgs from spam queue!")
+      (util/process-file-by-lines file report-spam-line identity))
+    (catch java.io.FileNotFoundException e
+      (log/error "spam-queue file not found. Please run notube -n <channel-id> first.")
+      (System/exit 2))))
 
-;; repl'ng: report this id...
-;; (yt/report-comment-as-spam
-;;   (:id (edn/read-string (first (line-seq (clojure.java.io/reader (util/with-abs-path "spam-queue")))))))
+

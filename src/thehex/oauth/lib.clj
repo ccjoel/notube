@@ -14,9 +14,9 @@
   (:use [slingshot.slingshot :only [try+ throw+]])
   (:import [java.net URLEncoder]))
 
-(def server-port 8893)
+(def server-port 8899)
 
-;; TODO: clean the getenv/ or config.edn thing up. maybe use the environ lib which I can use stuff set on profiles OR env var..
+;; TODO clean env/config.edn logic
 (try
   (def oauth2-params
     {:client-id (or (System/getenv "YOUTUBE_CLIENT_ID")
@@ -51,7 +51,7 @@
         (log/trace (str "Putting code in creds-chan inside async/go: " code))
         (>!! creds-chan code)
         (log/trace "Finished putting code in creds-chan inside async/go"))
-      (log/debug (str "Got code from oauth2: " code))
+      (log/debug (str "Code from oauth2: " code))
       ;; TODO: close browser? or do we leave user there doing nothing?
       ;; if browse-url cant close browser- can we use something like selenium?
       "Authentication Succeeded."))) ;; Return something to browser body
@@ -73,17 +73,18 @@
 (defn start-server!
   ""
   []
-  (log/debug (str "Starting Server on port " server-port " to catch oath code"))
+  (log/infof "Starting Server on port %s to catch oauth code." server-port)
   (reset! server (web/run-server (handler/site #'all-routes) {:port server-port})))
 
 (defn stop-server!
   "Gracefully shutdown server: wait 100ms for existing requests to be finished
    :timeout is optional, when no timeout, stop immediately"
   []
-  (log/debug "Stopping server...")
+  (log/warn "Stopping server...")
   (when-not (nil? @server)
     (@server :timeout 100)
-    (reset! server nil)))
+    (reset! server nil))
+  (log/warn "Server stopped."))
 
 (defn fetch-tokens!
   "
@@ -109,7 +110,7 @@
                                          :client_id    (:client-id oauth2-params)
                                          :redirect_uri (:redirect-uri oauth2-params)
                                          :client_secret (:client-secret oauth2-params)}})]
-      (log/trace (format "Status: %s \n Headers: %s \n error: %s \n" status headers error))
+      (log/debug (format "Status: %s \n Headers: %s \n error: %s \n" status headers error))
       (log/trace (str "Token response body: " body))
       body)
     (catch Exception e
@@ -137,7 +138,7 @@
   "Use most functions in this namespace to setup a server, start a browser session, authenticate users and setup tokens for use by api."
   []
   (log/info "Populating all tokens...")
-  (log/debug (str "Start server res: " (start-server!)))
+  (start-server!)
   (browser/browse-url (authorization-uri oauth2-params))
   ;; TODO: set a timeout here just in case user doesnt log in
   (log/debug "Awaiting code from creds channel")
@@ -147,10 +148,12 @@
                     (let [token-res (fetch-tokens! code)]
                       (if (get token-res "error")
                         (do
-                          (log/debug "Received error on token response..not updating nor persisting token map")
+                          (log/error "Received error on token response..not updating nor persisting token map")
                           nil)
                         (persist-tokens! (reset! token-map token-res))))
-                    (stop-server!)))]
+                    (log/info "Populated tokens. Stopping server and exiting.")
+                    (stop-server!)
+                    (System/exit 0)))]
     (<!! go-chan)))
 
 (defn refresh-tokens!

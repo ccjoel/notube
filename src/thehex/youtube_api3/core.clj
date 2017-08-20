@@ -138,7 +138,7 @@
 (defn search-users
   "Original Url: https://www.googleapis.com/youtube/v3/search?part=snippet&q=someusername&key=
 
-  Use like: `(search-users 'pewdiepie')`
+  Use like: `(search-users \"pewdiepie\")`
 
   my channel= UC4-vzjcBolmvYWYP6ldbLbA
   another channel id = UC4u8goEsLgpPvDX2mKD70nQ
@@ -147,14 +147,15 @@
   (let [url (str config/api-base "search?part=snippet&q=" query
                  "&type=channel" "&maxResults=50" "&key=" @api-key)
         body (-> (http/get url {:as :json}) :body)]
-    ;; (log/debug (str "Got videos from search: " body))
     (let [as-json (json/read-str body)
           page-info (get as-json "pageInfo")]
-      (log/debugf "Total Results: %s, resultsPerPage: %s" (get page-info "totalResults") (get page-info "resultsPerPage"))
+      (log/debugf "Total Results: %s, resultsPerPage: %s"
+                  (get page-info "totalResults") (get page-info "resultsPerPage"))
       (let [items (get as-json "items")]
         (log/info (apply str
                          (map
-                          (fn [item] (str (get (get item "snippet") "title") ": " (get (get item "id") "channelId") "\n"))
+                          (fn [item]
+                            (str (get (get item "snippet") "title") ": " (get (get item "id") "channelId") "\n"))
                           (filter (fn [item]
                                     (let [id (get item "id")]
                                       (= (get id "kind") "youtube#channel")))

@@ -144,18 +144,21 @@
   another channel id = UC4u8goEsLgpPvDX2mKD70nQ
   "
   [query]
-  (let [url (str config/api-base "search?part=snippet&q=" query "&key=" @api-key)
+  (let [url (str config/api-base "search?part=snippet&q=" query
+                 "&type=channel" "&maxResults=50" "&key=" @api-key)
         body (-> (http/get url {:as :json}) :body)]
     ;; (log/debug (str "Got videos from search: " body))
     (let [as-json (json/read-str body)
           page-info (get as-json "pageInfo")]
       (log/debugf "Total Results: %s, resultsPerPage: %s" (get page-info "totalResults") (get page-info "resultsPerPage"))
       (let [items (get as-json "items")]
-        (log/info (seq (map #(get (get % "id") "channelId")
-                              (filter (fn [item]
-                                        (let [id (get item "id")]
-                                          (= (get id "kind") "youtube#channel")))
-                                      items))))))))
+        (log/info (apply str
+                         (map
+                          (fn [item] (str (get (get item "snippet") "title") ": " (get (get item "id") "channelId") "\n"))
+                          (filter (fn [item]
+                                    (let [id (get item "id")]
+                                      (= (get id "kind") "youtube#channel")))
+                                  items))))))))
 
 (defn report-comment-as-spam
   "Reports a comment as spam, provided a comment id.

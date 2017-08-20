@@ -14,14 +14,13 @@
 
 (def timbre-config
   {:level log-level  ; e/o #{:trace :debug :info :warn :error :fatal :report}
-   ;; Control log filtering by namespaces/patterns. Useful for turning off
-   ;; logging in noisy libraries, etc.:
-   ;;    :ns-whitelist  [] #_["my-app.foo-ns"]
    :ns-blacklist  [] #_["taoensso.*"]
    :middleware [] ; (fns [data]) -> ?data, applied left->right
-   ;; Clj only:
-   ;;    :timestamp-opts default-timestamp-opts ; {:pattern _ :locale _ :timezone _}
-   ;;    :output-fn default-output-fn ; (fn [data]) -> string
-   :appenders {:spit (appenders/spit-appender {:fname (util/with-abs-path "notube.log")})}})
+   ;; timbre/default-output-fn
+   :appenders {:spit (appenders/spit-appender {:fname (util/with-abs-path "notube.log")})
+               :println {:output-fn (fn [data]
+                                      (if (:?msg-fmt data)
+                                        (apply (partial printf (:?msg-fmt data)) (:vargs data))
+                                        (apply str (:vargs data))))}}})
 
 (timbre/merge-config! timbre-config)

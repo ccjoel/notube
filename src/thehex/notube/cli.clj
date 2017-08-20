@@ -33,8 +33,7 @@
       (:errors clargs) (doseq [e (:errors clargs)] (println e))
       (= (:tokenaction opts) "p") (oauth/populate-tokens!)
       (= (:tokenaction opts) "r") (oauth/refresh-tokens!)
-      ;; TODO: dont just check videos from one channel...
       (:channel-id opts) (notube/handle-all-channel-videos (:channel-id opts)) ;; need to pass channel id
       (:username opts) (yt/search-users (:username opts))
       (:report opts) (notube/report-spam-queue)
-      :else (log/infof "Received these args: %s.\n Summary:\n%s" args (:summary clargs)))))
+      :else (log/infof "Notube v0.1.1\nUsage:\n%s" (:summary clargs)))))

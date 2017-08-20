@@ -33,7 +33,7 @@
         (process-fn line))))))
 
 (defn read-config-key
-  ""
+  "Simple utility fn to read a key from config.edn"
   [key]
   (get
    (edn/read-string (slurp (clojure.java.io/resource "config.edn")))

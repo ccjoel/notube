@@ -164,7 +164,7 @@
                     (log/info "Populated tokens. Stopping server and exiting.")
                     (stop-server!)
                     (System/exit 0)))]
-    (<!! go-chan) ;; TODO: is this needed?
+    (<!! go-chan) ;; needed to wait until go channel is finished
     ))
 
 (defn refresh-tokens!

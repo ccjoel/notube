@@ -14,7 +14,7 @@ Run the project's tests (they'll fail until you edit them):
 
 Build an uberjar from the project:
 
-    $ boot build
+    $ boot uberjar
 
 Run the uberjar:
 

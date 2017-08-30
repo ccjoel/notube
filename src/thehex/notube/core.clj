@@ -17,9 +17,6 @@
 (def blacklist (edn/read-string
                 (slurp (clojure.java.io/resource "blacklist.edn"))))
 
-(def videos (edn/read-string
-                (slurp (clojure.java.io/resource "sample-data/videos.edn"))))
-
 (defn parse-videos
   "Loop through videos, find all comment threads, scan each,
   store bad ones on a file... "
@@ -127,11 +124,7 @@
     (:text parsed)))
 
 (defn report-spam-queue
-  "REPORTS ALL THE SPAM QUEUE WITH YOUTUBE API. Be Careful here.
-   Use like:
-  (yt/report-comment-as-spam
-    (:id (edn/read-string (first (line-seq (clojure.java.io/reader (util/with-abs-path \"spam-queue\")))))))
-  "
+  "REPORTS ALL THE SPAM QUEUE WITH YOUTUBE API. Be Careful here."
   []
   ;; TODO: maybe clear or do something to spam queue.. what happens if we try to report twice?
   (try
@@ -142,4 +135,5 @@
       (log/error "spam-queue file not found. Please run notube -n <channel-id> first.")
       (System/exit 2))))
 
-
+;; (def videos (edn/read-string
+;;              (slurp (clojure.java.io/resource "sample-data/videos.edn"))))

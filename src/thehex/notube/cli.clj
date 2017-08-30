@@ -30,10 +30,11 @@
   (let [clargs (parse-opts args cli-options)
         opts (:options clargs)]
     (cond
-      (:errors clargs) (doseq [e (:errors clargs)] (println e))
+      ;; (:errors clargs) (doseq [e (:errors clargs)] (println e))
       (= (:tokenaction opts) "p") (oauth/populate-tokens!)
       (= (:tokenaction opts) "r") (oauth/refresh-tokens!)
       (:channel-id opts) (notube/handle-all-channel-videos (:channel-id opts)) ;; need to pass channel id
       (:username opts) (yt/search-users (:username opts))
       (:report opts) (notube/report-spam-queue)
-      :else (log/infof "Notube v0.1.1\nUsage:\n%s" (:summary clargs)))))
+      :else (do (log/infof "Notube v0.1.1\nUsage:\n%s\n" (:summary clargs))
+                (System/exit 0)))))

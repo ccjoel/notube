@@ -8,34 +8,36 @@
             [clojure.edn :as edn]
             [taoensso.timbre :as log]
             [clojure.data.json :as json]
+            [slingshot.slingshot :refer [try+]]
             ;; internal
             [thehex.notube.config :as config]
             [thehex.notube.util :as util])
-  (:use [slingshot.slingshot :only [try+ throw+]])
   (:import [java.net URLEncoder]))
 
-(def server-port 8899)
+(def server-port
+  (let [port (util/read-config :port)]
+    (if port
+      (try
+        (Integer/parseInt port)
+        (catch java.lang.ClassCastException e
+          port))
+      8889)))
 
-;; TODO clean env/config.edn logic
-(try
-  (def oauth2-params
-    {:client-id (or (System/getenv "YOUTUBE_CLIENT_ID")
-                    (:youtube-client-id (edn/read-string
-                                         (slurp (clojure.java.io/resource "config.edn")))))
-     :client-secret (or (System/getenv "YOUTUBE_CLIENT_SECRET")
-                        (:youtube-client-secret (edn/read-string
-                                                 (slurp (clojure.java.io/resource "config.edn")))))
-     :authorize-uri  "https://accounts.google.com/o/oauth2/auth"
-     ;; google will append code= grab this query param on server
-     :redirect-uri (format "http://127.0.0.1:%s/oauth2" server-port) ;; or #error hash if failed or not authorized
-     :access-token-uri "https://accounts.google.com/o/oauth2/token"
-     :scope "https://www.googleapis.com/auth/youtube.force-ssl"})
-  (catch Exception e
-    (log/debug e "Check oauth2-params on oauth.lib")
-    (log/error "No youtube client id or secret on environment var, nor on resources/config.edn")))
+(def oauth2-params
+  {:client-id (or (System/getenv "YOUTUBE_CLIENT_ID")
+                  (util/read-config :youtube-client-id))
+   :client-secret (or (System/getenv "YOUTUBE_CLIENT_SECRET")
+                      (util/read-config :youtube-client-secret))
+   :authorize-uri  "https://accounts.google.com/o/oauth2/auth"
+   ;; google will append code= grab this query param on server
+   :redirect-uri (format "http://127.0.0.1:%s/oauth2" server-port) ;; or #error hash if failed or not authorized
+   :access-token-uri "https://accounts.google.com/o/oauth2/token"
+   :scope "https://www.googleapis.com/auth/youtube.force-ssl"})
 
 (defonce server (atom nil))
 (def creds-chan (chan))
+
+(declare stop-server!)
 
 ;; we have a token map here, and a token map param when we persist. maybe we can remove and stop using this?
 (def token-map (atom nil))
@@ -45,11 +47,15 @@
   (compojure/GET "/oauth2" {params :query-params}
     (log/debug "handling oauth2 endpoint...")
     (let [code (get params "code")]
-      (log/debug "got code on /ouath2 endpoint")
+      (log/debug "got code on /oauth2 endpoint")
       ;; TODO: set timeout for if user doesnt authenticate? can then stop all this (close channel) and stop server
       (do
         (log/trace (str "Putting code in creds-chan inside async/go: " code))
-        (>!! creds-chan code)
+        (if (nil? code)
+          (do
+            (stop-server!)
+            (System/exit 2))
+          (>!! creds-chan code))
         (log/trace "Finished putting code in creds-chan inside async/go"))
       (log/debug (str "Code from oauth2: " code))
       ;; TODO: close browser? or do we leave user there doing nothing?
@@ -132,7 +138,11 @@
   ""
   []
   (log/debug "Retrieving tokens map from tokens.edn")
-  (edn/read-string (slurp (util/with-abs-path "tokens.edn"))))
+  (try
+    (edn/read-string (slurp (util/with-abs-path "tokens.edn")))
+    (catch Exception e
+      (log/info "\nUnable to load tokens. Please create tokens.edn file by popoulating with `-t p`. You can also manually copy a previously known tokens.edn file to project install dir.")
+      (log/trace e))))
 
 (defn populate-tokens!
   "Use most functions in this namespace to setup a server, start a browser session, authenticate users and setup tokens for use by api."
@@ -154,7 +164,8 @@
                     (log/info "Populated tokens. Stopping server and exiting.")
                     (stop-server!)
                     (System/exit 0)))]
-    (<!! go-chan)))
+    (<!! go-chan) ;; TODO: is this needed?
+    ))
 
 (defn refresh-tokens!
   "Request a new access token

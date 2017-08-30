@@ -2,51 +2,20 @@
   (:require [thehex.youtube-api3.config :as config]
             [thehex.oauth.lib :as oauth]
             [clj-http.client :as http]
-            [clojure.edn :as edn]
+            [thehex.notube.util :as util]
             [clojure.data.json :as json]
             [thehex.notube.config :as notube-config]
             [taoensso.timbre :as log])
-  (:use [slingshot.slingshot :only [try+ throw+]]))
+  (:use [slingshot.slingshot :only [try+]]))
 
-;; SOME sample url and requests from youtube api... most implemented in actual file
-;; - Specific Comment by Id
-;; https://www.googleapis.com/youtube/v3/comments?id=z124jjhzrlfitdvcw23xfzyrdya4ij0kj&part=snippet&key=
-;; - Video info (statistics.. change part to get different info)
-;; https://www.googleapis.com/youtube/v3/videos?part=statistics&id=UTXCu1VQDRw&key=
-;; - Search all videos of pewdiepie's channel, ordered by date, newest first
-;; https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&order=date&key=
-;; With OAUTH and logged in w/ youtube user:
-;; POST https://www.googleapis.com/youtube/v3/commenThreads?part=snippet&key=
-;; post raw json body:
-;; {
-;;   "snippet": {
-;;     "channelId": "UC-lHJZR3Gqxm24_Vd_AJ5Yw",
-;;     "topLevelComment": {
-;;       "snippet": {
-;;         "textOriginal": "comment3"
-;;       }
-;;     },
-;;     "videoId": "TvxkKs2J0Vw"
-;;   }
-;; }
-
-(def tokens (atom nil))
-
-(try
-  (reset! tokens (oauth/read-persisted-tokens))
-  (catch Exception e
-    (log/info "\nUnable to initially load tokens. Please create tokens.edn file by popoulating with `-t p`. you can also manually copy a previously known tokens.edn file to project root dir.")
-    (log/trace e)))
-
-(def api-key (atom nil))
-
-(try
-  (reset! api-key (->
-                   (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
-                   :api-key))
-  (catch java.lang.IllegalArgumentException e
-    (log/error "Please copy config.sample.edn file into config.edn and set youtube api app settings.")
-    (log/trace e)))
+(defn api-key
+  []
+  (let [apikey (util/read-config :api-key)]
+    (or (and (not (empty? apikey)) apikey)
+     (System/getenv "YOUTUBE_API_KEY")
+     (do
+       (log/error "No api key on config file found. Please update on config.edn")
+       (System/exit 3)))))
 
 (defn get-my-channels
   " Example...
@@ -61,7 +30,7 @@
    (let [url (str config/api-base "channels?part=id&mine=true")
          body (-> (http/get url
                             {:headers {:Authorization
-                                       (str "Bearer " (:access-token @tokens))}
+                                       (str "Bearer " (:access-token (oauth/read-persisted-tokens)))}
                              :as :json})
                   :body ;; TODO: body is json? or json str?
                   ;; TODO:
@@ -78,13 +47,12 @@
    (catch [:status 401] e (log/error e))))
 
 (defn get-video-commentThreads
-  " https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=UTXCu1VQDRw&key=
-  Use like: (get-video-commentThreads  \"d2dNb0wdJF0\")
-  "
+  "https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=UTXCu1VQDRw&key=
+   Use like: (get-video-commentThreads  \"d2dNb0wdJF0\")"
   ([video-id page-token]
    (try+
     (let [url (str config/api-base "commentThreads?part=snippet&videoId="
-                   video-id "&order=time&key=" @api-key
+                   video-id "&order=time&key=" (api-key)
                    (when page-token
                      (str "&pageToken=" page-token)))
           body (-> (http/get url {:as :json}) :body)]
@@ -97,15 +65,13 @@
 
 (defn get-channel-activity
   "Original Url: https://www.googleapis.com/youtube/v3/activities?part=snippet&channelId=UC-lHJZR3Gqxm24_Vd_AJ5Yw&key=
-
   Use like: `(get-channel-activity api-key 'UC-lHJZR3Gqxm24_Vd_AJ5Yw')`
-
-
   my channel= UC4-vzjcBolmvYWYP6ldbLbA
   another channel id = UC4u8goEsLgpPvDX2mKD70nQ"
   ([channel-id page-token]
    (let [url (str config/api-base "activities?part=snippet&channelId=" channel-id
-                  "&key=" @api-key (when page-token (str "&pageToken=" page-token)))
+                  "&key=" (api-key)
+                  (when page-token (str "&pageToken=" page-token)))
          body (-> (http/get url {:as :json}) :body)]
      (log/debug (str "Got activites: " body))
      body))
@@ -123,7 +89,7 @@
   "
   ([channel-id page-token]
    (let [url (str config/api-base "search?part=snippet&channelId=" channel-id
-                  "&key=" @api-key "&order=date"
+                  "&key=" (api-key) "&order=date"
                   (when page-token
                     (str "&pageToken=" page-token)))
          body (-> (http/get url {:as :json}) :body)]
@@ -145,7 +111,7 @@
   "
   [query]
   (let [url (str config/api-base "search?part=snippet&q=" query
-                 "&type=channel" "&maxResults=50" "&key=" @api-key)
+                 "&type=channel" "&maxResults=50" "&key=" (api-key))
         body (-> (http/get url {:as :json}) :body)]
     (let [as-json (json/read-str body)
           page-info (get as-json "pageInfo")]
@@ -172,7 +138,7 @@
    (let [url (str config/api-base "comments/markAsSpam?id=" comment-id)
          res (http/post url
                         {:headers {:Authorization
-                                   (str "Bearer " (:access-token @tokens))}
+                                   (str "Bearer " (:access-token (oauth/read-persisted-tokens)))}
                          :as :json})]
      (log/info "Sucessfully reported comment as spam.")
      true)

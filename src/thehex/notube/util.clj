@@ -1,8 +1,9 @@
 (ns thehex.notube.util
-  (:require [clojure.edn :as edn]
-            [taoensso.timbre :as log]))
+  (:require
+   [clojure.edn :as edn]
+   [taoensso.timbre :as log]))
 
-(declare read-config-key)
+(declare read-config)
 
 (def ^:const prod?
   (boolean (System/getProperty "prod")))
@@ -12,7 +13,7 @@
   [filename]
   (str
    (if prod?
-     (read-config-key :install-dir)
+     (read-config :install-dir)
      (.getCanonicalPath (clojure.java.io/file ".")))
    (java.io.File/separator)
    filename))
@@ -32,9 +33,24 @@
        (output-fn
         (process-fn line))))))
 
-(defn read-config-key
+(defmulti read-config
   "Simple utility fn to read a key from config.edn"
+  (fn [& args]
+    (when args
+      (type (first args)))))
+
+(defmethod read-config nil
+  [& args]
+  (try
+    (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
+    (catch java.lang.IllegalArgumentException e
+      (log/error "Please copy config.sample.edn file into config.edn and set youtube api app settings.")
+      (log/trace e))))
+
+(defmethod read-config clojure.lang.Keyword
   [key]
-  (get
-   (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
-   key))
+  (-> (read-config) key))
+
+(defmethod read-config java.lang.String
+  [str]
+  (read-config (keyword str)))

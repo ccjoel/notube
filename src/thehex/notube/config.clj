@@ -9,7 +9,7 @@
 
 (def ^:const log-level
   (if util/prod?
-    (keyword (util/read-config-key :log-level))
+    (keyword (util/read-config :log-level))
     :trace))
 
 (def timbre-config

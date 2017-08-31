@@ -1,1 +1,1 @@
-exec java -jar target/notube-0.1.1.jar "$@" 
+exec java -jar target/notube-0.1.2.jar "$@" 

@@ -150,7 +150,7 @@
   (log/info "Populating all tokens...")
   (start-server!)
   (browser/browse-url (authorization-uri oauth2-params))
-  ;; TODO: set a timeout here just in case user doesnt log in
+  ;; TODO: set a timeout here on async channel just in case user doesnt log in
   (log/debug "Awaiting code from creds channel")
   (let [go-chan (go
                   (let [code (<! creds-chan)]

@@ -1,15 +1,14 @@
 #!/usr/bin/env boot
 
 (def project 'notube)
-(def version "0.1.1")
+(def version "0.1.2")
 
 (set-env!
  :source-paths #{"src"}
  :resource-paths #{"resources"}
  :dependencies '[[org.clojure/clojure "1.8.0"]
                  [adzerk/boot-test "1.1.2" :scope "test"] ;; only needed for tests..ensure this is the case
-                 [javax.servlet/servlet-api "2.5"] ;; is this needed?
-                 [clj-http "3.4.1"] ;; TODO: replace with http-kit client code
+                 [javax.servlet/servlet-api "2.5"] ;; needed for compojure/server routes
                  [http-kit "2.2.0"] ;; for client and web server
                  [compojure "1.5.2"] ;; simple route to populate tokens from google login
                  [com.taoensso/timbre "4.8.0"]

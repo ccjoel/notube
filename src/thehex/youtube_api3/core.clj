@@ -1,7 +1,7 @@
 (ns thehex.youtube-api3.core
   (:require [thehex.youtube-api3.config :as config]
             [thehex.oauth.lib :as oauth]
-            [clj-http.client :as http]
+            [org.httpkit.client :as http2]
             [thehex.notube.util :as util]
             [clojure.data.json :as json]
             [thehex.notube.config :as notube-config]
@@ -17,49 +17,29 @@
        (log/error "No api key on config file found. Please update on config.edn")
        (System/exit 3)))))
 
-(defn get-my-channels
-  " Example...
-  The API supports two ways to specify an access token:
-  1. curl -H \"Authorization: Bearer ACCESS_TOKEN\" https://www.googleapis.com/youtube/v3/channels?part=id&mine=true
-  2. curl https://www.googleapis.com/youtube/v3/channels?part=id&mine=true&access_token=ACCESS_TOKEN
-  TODO: try catch 401. if 401, we nee to refresh the access token
-  TODO: this call is not part of the oauth validation file, is an actual api call. move
-  Use like: (get-user-channels) "
-  []
+(defn api-call
+  ""
+  [url]
   (try+
-   (let [url (str config/api-base "channels?part=id&mine=true")
-         body (-> (http/get url
-                            {:headers {:Authorization
-                                       (str "Bearer " (:access-token (oauth/read-persisted-tokens)))}
-                             :as :json})
-                  :body ;; TODO: body is json? or json str?
-                  ;; TODO:
-                  ;; will receive a 401 HTTP unauthorize if the access token expired
-                  ;;:user ... old example on getting data...
-                  )
-         as-json (json/read-str body)
-         result-count (get (get as-json "pageInfo") "totalResults")]
-     (log/debug (str "Got body in get-user-channels: " body))
-
-     (if (> result-count 0)
-       (get as-json "items")
-       nil))
-   (catch [:status 401] e (log/error e))))
+   (let [{:keys [status headers error body]} @(http2/get url)]
+     (log/debug (format "Status: %s \n Headers: %s \n error: %s \n" status headers error))
+     body)
+   (catch [:status 401] e
+     (log/error e)
+     (System/exit 4))))
 
 (defn get-video-commentThreads
   "https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=UTXCu1VQDRw&key=
    Use like: (get-video-commentThreads  \"d2dNb0wdJF0\")"
   ([video-id page-token]
-   (try+
-    (let [url (str config/api-base "commentThreads?part=snippet&videoId="
-                   video-id "&order=time&key=" (api-key)
-                   (when page-token
-                     (str "&pageToken=" page-token)))
-          body (-> (http/get url {:as :json}) :body)]
-      (log/tracef "Got comments from search: %s" body)
-      (let [as-json (json/read-str body)]
-        [(get as-json "items") (get as-json "nextPageToken")]))
-    (catch [:status 401] e (log/error e))))
+   (let [url (str config/api-base "commentThreads?part=snippet&videoId="
+                  video-id "&order=time&key=" (api-key)
+                  (when page-token
+                    (str "&pageToken=" page-token)))
+         body (api-call url)]
+     (log/trace (str "Got comments from search: " body))
+     (let [as-json (json/read-str body)]
+       [(get as-json "items") (get as-json "nextPageToken")])))
   ([video-id]
    (get-video-commentThreads video-id nil)))
 
@@ -72,7 +52,7 @@
    (let [url (str config/api-base "activities?part=snippet&channelId=" channel-id
                   "&key=" (api-key)
                   (when page-token (str "&pageToken=" page-token)))
-         body (-> (http/get url {:as :json}) :body)]
+         body (api-call url)]
      (log/debug (str "Got activites: " body))
      body))
   ([channel-id]
@@ -92,7 +72,7 @@
                   "&key=" (api-key) "&order=date"
                   (when page-token
                     (str "&pageToken=" page-token)))
-         body (-> (http/get url {:as :json}) :body)]
+         body (api-call url)]
      (log/debug (str "Got videos from search: " body))
      (let [as-json (json/read-str body)
            page-info (get as-json "pageInfo")]
@@ -112,7 +92,7 @@
   [query]
   (let [url (str config/api-base "search?part=snippet&q=" query
                  "&type=channel" "&maxResults=50" "&key=" (api-key))
-        body (-> (http/get url {:as :json}) :body)]
+        body (api-call url)]
     (let [as-json (json/read-str body)
           page-info (get as-json "pageInfo")]
       (log/debugf "Total Results: %s, resultsPerPage: %s"
@@ -136,10 +116,9 @@
   [comment-id]
   (try+
    (let [url (str config/api-base "comments/markAsSpam?id=" comment-id)
-         res (http/post url
-                        {:headers {:Authorization
-                                   (str "Bearer " (:access-token (oauth/read-persisted-tokens)))}
-                         :as :json})]
+         res @(http2/post url
+                        {:headers {"Authorization"
+                                   (str "Bearer " (:access-token (oauth/read-persisted-tokens)))}})]
      (log/info "Sucessfully reported comment as spam.")
      true)
    (catch [:status 401] e (log/error e "got 401 on report spam") false)

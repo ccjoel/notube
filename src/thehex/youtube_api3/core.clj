@@ -3,10 +3,7 @@
             [thehex.oauth.lib :as oauth]
             [org.httpkit.client :as http2]
             [thehex.notube.util :as util]
-            [clojure.data.json :as json]
-            [thehex.notube.config :as notube-config]
-            [taoensso.timbre :as log])
-  (:use [slingshot.slingshot :only [try+]]))
+            [clojure.data.json :as json]))
 
 (defn api-key
   []
@@ -14,18 +11,19 @@
     (or (and (not (empty? apikey)) apikey)
      (System/getenv "YOUTUBE_API_KEY")
      (do
-       (log/error "No api key on config file found. Please update on config.edn")
+       (println "No api key on config file found. Please update on config.edn")
        (System/exit 3)))))
 
 (defn api-call
   ""
   [url]
-  (try+
+  (try
    (let [{:keys [status headers error body]} @(http2/get url)]
-     (log/debug (format "Status: %s \n Headers: %s \n error: %s \n" status headers error))
+     (println "Status: \n Headers: \n error: \n" status "\n" headers "\n" error)
      body)
-   (catch [:status 401] e
-     (log/error e)
+   (catch Exception e
+     (binding [*out* *err*]
+       (println e))
      (System/exit 4))))
 
 (defn get-video-commentThreads
@@ -37,7 +35,6 @@
                   (when page-token
                     (str "&pageToken=" page-token)))
          body (api-call url)]
-     (log/trace (str "Got comments from search: " body))
      (let [as-json (json/read-str body)]
        [(get as-json "items") (get as-json "nextPageToken")])))
   ([video-id]
@@ -53,7 +50,7 @@
                   "&key=" (api-key)
                   (when page-token (str "&pageToken=" page-token)))
          body (api-call url)]
-     (log/debug (str "Got activites: " body))
+     (println (str "Got activites: " body))
      body))
   ([channel-id]
    (get-channel-activity channel-id nil)))
@@ -73,10 +70,10 @@
                   (when page-token
                     (str "&pageToken=" page-token)))
          body (api-call url)]
-     (log/debug (str "Got videos from search: " body))
+     (println (str "Got videos from search: " body))
      (let [as-json (json/read-str body)
            page-info (get as-json "pageInfo")]
-       (log/debugf "Total Results: %s, resultsPerPage: %s" (get page-info "totalResults") (get page-info "resultsPerPage"))
+       (println "Total Results: , resultsPerPage: " (get page-info "totalResults") (get page-info "resultsPerPage"))
        [(get as-json "items") (get as-json "nextPageToken")])))
   ([channel-id]
    (search-channel-videos channel-id nil)))
@@ -95,10 +92,10 @@
         body (api-call url)]
     (let [as-json (json/read-str body)
           page-info (get as-json "pageInfo")]
-      (log/debugf "Total Results: %s, resultsPerPage: %s"
+      (println "Total Results: , resultsPerPage: "
                   (get page-info "totalResults") (get page-info "resultsPerPage"))
       (let [items (get as-json "items")]
-        (log/info (apply str
+        (println (apply str
                          (map
                           (fn [item]
                             (str (get (get item "snippet") "title") ": " (get (get item "id") "channelId") "\n"))
@@ -114,14 +111,13 @@
   - insufficient permissions. The request might not be properly authorized.
   - commentNotFound"
   [comment-id]
-  (try+
+  (try
    (let [url (str config/api-base "comments/markAsSpam?id=" comment-id)
          res @(http2/post url
                         {:headers {"Authorization"
                                    (str "Bearer " (:access-token (oauth/read-persisted-tokens)))}})]
-     (log/info "Sucessfully reported comment as spam.")
+     (println "Sucessfully reported comment as spam.")
      true)
-   (catch [:status 401] e (log/error e "got 401 on report spam") false)
-   (catch [:status 400] e (log/error e "got 400 on report spam") false)
-   (catch [:status 403] e (log/error e "got 403 on report spam") false)
-   (catch [:status 404] e (log/error e "got 404 on report spam") false)))
+   (catch Exception e
+     (println "got 401 or so on report spam" e)
+     false)))

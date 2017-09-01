@@ -1,7 +1,6 @@
 (ns thehex.notube.core
   (:require
    [clojure.edn :as edn]
-   [taoensso.timbre :as log]
    [thehex.youtube-api3.core :as yt]
    [thehex.notube.util :as util]
    [thehex.oauth.lib :as oauth])
@@ -39,10 +38,10 @@
   (let [text (get-in comment ["snippet" "topLevelComment" "snippet" "textOriginal"])
         author (get-in comment ["snippet" "topLevelComment" "snippet" "authorDisplayName"])]
     (if (some nil? [text author])
-      (log/warnf "This parsed comment: %s \n\n doesnt have text and/or author!" comment)
+      (println "This parsed comment doesnt have text and/or author!" comment)
       (do
-        (log/debugf "Handling comment, commented by user: %s" author)
-        (log/debugf "Comment text is: %s" text)
+        ;; (println "Handling comment, commented by user: " author)
+        ;; (println "Comment text is: " text)
         (store-comment comment (is-spam? text author))))))
 
 (defn comment->id-text-pair
@@ -59,7 +58,7 @@
   We'll either store to spam queue, ot to a whitelist queue to check for false
   negatives + find new spam sources."
   [comment is-spam]
-  (log/debug "storing comment")
+  (println "storing comment")
   (spit (util/with-abs-path (if is-spam "spam-queue" "white-queue"))
         (str (comment->id-text-pair comment) "\n")
         :append true))
@@ -129,10 +128,11 @@
   ;; TODO: maybe clear or do something to spam queue.. what happens if we try to report twice?
   (try
     (let [file (util/with-abs-path "spam-queue")]
-      (log/info "Reporting ALL SPAM msgs from spam queue!")
+      (println "Reporting ALL SPAM msgs from spam queue!")
       (util/process-file-by-lines file report-spam-line identity))
     (catch java.io.FileNotFoundException e
-      (log/error "spam-queue file not found. Please run notube -n <channel-id> first.")
+      (binding [*out* *err*]
+        (println "spam-queue file not found. Please run notube -n <channel-id> first."))
       (System/exit 2))))
 
 ;; (def videos (edn/read-string

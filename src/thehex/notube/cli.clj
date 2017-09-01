@@ -3,8 +3,7 @@
             [thehex.notube.util :as util]
             [thehex.notube.core :as notube]
             [thehex.youtube-api3.core :as yt]
-            [thehex.oauth.lib :as oauth]
-            [taoensso.timbre :as log])
+            [thehex.oauth.lib :as oauth])
   (:gen-class))
 
 (def cli-options
@@ -35,5 +34,4 @@
       (:channel-id opts) (notube/handle-all-channel-videos (:channel-id opts)) ;; need to pass channel id
       (:username opts) (yt/search-users (:username opts))
       (:report opts) (notube/report-spam-queue)
-      :else (do (log/infof "Notube v0.1.1\nUsage:\n%s\n" (:summary clargs))
-                (System/exit 0)))))
+      :else (println "Notube v0.1.1\nUsage:\n" (:summary clargs)))))

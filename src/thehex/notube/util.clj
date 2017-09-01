@@ -1,7 +1,6 @@
 (ns thehex.notube.util
   (:require
-   [clojure.edn :as edn]
-   [taoensso.timbre :as log]))
+   [clojure.edn :as edn]))
 
 (declare read-config)
 
@@ -44,8 +43,8 @@
   (try
     (edn/read-string (slurp (clojure.java.io/resource "config.edn")))
     (catch java.lang.IllegalArgumentException e
-      (log/error "Please copy config.sample.edn file into config.edn and set youtube api app settings.")
-      (log/trace e))))
+      (binding [*out* *err*]
+        (println "Please copy config.sample.edn file into config.edn and set youtube api app settings.")))))
 
 (defmethod read-config clojure.lang.Keyword
   [key]

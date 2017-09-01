@@ -3,14 +3,12 @@
             [clojure.java.browse :as browser]
             [clojure.core.async :as async :refer [<! >! <!! >!! timeout chan alt! go]]
             [org.httpkit.server :as web]
-            [compojure.route :as route] [compojure.handler :as handler]
+            [compojure.route :as route]
+            [compojure.handler :as handler]
             [compojure.core :as compojure]
             [clojure.edn :as edn]
-            [taoensso.timbre :as log]
             [clojure.data.json :as json]
-            [slingshot.slingshot :refer [try+]]
             ;; internal
-            [thehex.notube.config :as config]
             [thehex.notube.util :as util])
   (:import [java.net URLEncoder]))
 
@@ -45,19 +43,19 @@
 (compojure/defroutes all-routes
   (compojure/GET "/" [] "Hello, World!")
   (compojure/GET "/oauth2" {params :query-params}
-    (log/debug "handling oauth2 endpoint...")
+    (println "handling oauth2 endpoint...")
     (let [code (get params "code")]
-      (log/debug "got code on /oauth2 endpoint")
+      (println "got code on /oauth2 endpoint")
       ;; TODO: set timeout for if user doesnt authenticate? can then stop all this (close channel) and stop server
       (do
-        (log/trace (str "Putting code in creds-chan inside async/go: " code))
+        (println (str "Putting code in creds-chan inside async/go: " code))
         (if (nil? code)
           (do
             (stop-server!)
             (System/exit 2))
           (>!! creds-chan code))
-        (log/trace "Finished putting code in creds-chan inside async/go"))
-      (log/debug (str "Code from oauth2: " code))
+        (println "Finished putting code in creds-chan inside async/go"))
+      (println (str "Code from oauth2: " code))
       ;; TODO: close browser? or do we leave user there doing nothing?
       ;; if browse-url cant close browser- can we use something like selenium?
       "Authentication Succeeded."))) ;; Return something to browser body
@@ -79,18 +77,18 @@
 (defn start-server!
   ""
   []
-  (log/infof "Starting Server on port %s to catch oauth code." server-port)
+  (println "Starting Server on port " server-port " to catch oauth code.")
   (reset! server (web/run-server (handler/site #'all-routes) {:port server-port})))
 
 (defn stop-server!
   "Gracefully shutdown server: wait 100ms for existing requests to be finished
    :timeout is optional, when no timeout, stop immediately"
   []
-  (log/warn "Stopping server...")
+  (println "Stopping server...")
   (when-not (nil? @server)
     (@server :timeout 100)
     (reset! server nil))
-  (log/warn "Server stopped."))
+  (println "Server stopped."))
 
 (defn fetch-tokens!
   "
@@ -109,59 +107,57 @@
   "
   [code]
   (try
-    (log/trace (str "Retrieving tokens using code: " code))
+    (println (str "Retrieving tokens using code: " code))
     (let [{:keys [status headers error body]} @(http/post (:access-token-uri oauth2-params)
                           {:form-params {:code        code
                                          :grant_type   "authorization_code"
                                          :client_id    (:client-id oauth2-params)
                                          :redirect_uri (:redirect-uri oauth2-params)
                                          :client_secret (:client-secret oauth2-params)}})]
-      (log/debug (format "Status: %s \n Headers: %s \n error: %s \n" status headers error))
-      (log/trace (str "Token response body: " body))
+      (println (format "Status: %s \n Headers: %s \n error: %s \n" status headers error))
+      (println (str "Token response body: " body))
       body)
     (catch Exception e
-      (log/error (str e)))))
+      (binding [*out* *err*]
+        (println e)))))
 
 (defn persist-tokens!
   "Persist tokens in tokens.edn file. Receives a stringified json."
   [tokens-map]
-  (log/debug "Storing tokens map into tokens.edn")
-  (log/debugf "Token map atom res: %s" tokens-map)
+  (println "Storing tokens map into tokens.edn")
   (try (spit (util/with-abs-path "tokens.edn")
              (let [as-json (json/read-str tokens-map)]
                (str {:access-token (get as-json "access_token")
                      :refresh-token (get as-json "refresh_token")})))
        (catch java.lang.ClassCastException e
-         (log/error e "Did not send a json string to persist!"))))
+         (binding [*out* *err*]
+           (println "Did not send a json string to persist!")))))
 
 (defn read-persisted-tokens
   ""
   []
-  (log/debug "Retrieving tokens map from tokens.edn")
+  (println "Retrieving tokens map from tokens.edn")
   (try
     (edn/read-string (slurp (util/with-abs-path "tokens.edn")))
     (catch Exception e
-      (log/info "\nUnable to load tokens. Please create tokens.edn file by popoulating with `-t p`. You can also manually copy a previously known tokens.edn file to project install dir.")
-      (log/trace e))))
+      (println "\nUnable to load tokens. Please create tokens.edn file by popoulating with `-t p`. You can also manually copy a previously known tokens.edn file to project install dir."))))
 
 (defn populate-tokens!
   "Use most functions in this namespace to setup a server, start a browser session, authenticate users and setup tokens for use by api."
   []
-  (log/info "Populating all tokens...")
+  (println "Populating all tokens...")
   (start-server!)
   (browser/browse-url (authorization-uri oauth2-params))
   ;; TODO: set a timeout here on async channel just in case user doesnt log in
-  (log/debug "Awaiting code from creds channel")
+  (println "Awaiting code from creds channel")
   (let [go-chan (go
                   (let [code (<! creds-chan)]
-                    (log/trace "Got code from creds channel: " code)
                     (let [token-res (fetch-tokens! code)]
                       (if (get token-res "error")
-                        (do
-                          (log/error "Received error on token response..not updating nor persisting token map")
-                          nil)
+                        (binding [*out* *err*]
+                          (println "Received error on token response..not updating nor persisting token map"))
                         (persist-tokens! (reset! token-map token-res))))
-                    (log/info "Populated tokens. Stopping server and exiting.")
+                    (println "Populated tokens. Stopping server and exiting.")
                     (stop-server!)
                     (System/exit 0)))]
     (<!! go-chan) ;; needed to wait until go channel is finished
@@ -176,29 +172,28 @@
   in which case older refresh tokens will stop working."
   []
   (let [refresh-token (get (read-persisted-tokens) :refresh-token)]
-    (log/trace (str "Refreshing access token with refresh-token:" refresh-token))
-    (try+
+    (println (str "Refreshing access token with refresh-token:" refresh-token))
+    (try
      (let [{:keys [status headers error body]} @(http/post (:access-token-uri oauth2-params)
                                                            {:form-params {:grant_type       "refresh_token"
                                                                           :refresh_token    refresh-token
                                                                           :client_id (:client-id oauth2-params)
                                                                           :client_secret (:client-secret oauth2-params)}})
            as-json (json/read-str body)]
-       (log/debugf "status: %s, error: %s, body: %s" status error body)
-       (log/debugf "Refresh-tokens response as-json: " as-json)
        (persist-tokens! (reset! token-map (json/write-str {"access_token" (get as-json "access_token")
                                                            "refresh_token" refresh-token}))))
-     (catch [:status 401]
+     (catch Exception e
          ;; TODO: do something if refresh token has expired or otherwise lost...
          ;; maybe start the oauth login process again?
-         e (log/errorf "Received unauthorized 401 while trying to refresh tokens: %s" e)))))
+       (binding [*out* *err*]
+         (println "Received unauthorized 401 while trying to refresh tokens:" e))))))
 
 ;; TODO: idea form website for later... macro to wrap all catch 401 unauthorized from youtube api oauth calls?
 ;; something like:
 ;; (defn endpoint-call
 ;;   ""
 ;;   [endpoint-url access-token refresh-token]
-;;   (try+
+;;   (try
 ;;    (and (endpoint-url access-token)
 ;;         [access-token refresh-token])
-;;    (catch [:status 401] _ (refresh-tokens refresh-token))))
+;;    (catch Exception e (refresh-tokens refresh-token))))
